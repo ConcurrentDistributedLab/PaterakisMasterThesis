@@ -1,7 +1,8 @@
 \documentclass[a4paper,11pt,twoside,openany]{book}
 
 \usepackage{tipx}
-\usepackage[named]{libtex/algo}
+\usepackage{algo}
+% \usepackage[named]{libtex/algo}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{amssymb}
@@ -16,7 +17,7 @@
 \usepackage{multirow}
 \usepackage{dsfont}
 \usepackage{booktabs}
-\usepackage{subfloat}
+\usepackage[countmax]{subfloat}
 \usepackage{subcaption}
 \usepackage{color}
 \usepackage[table]{xcolor}
@@ -26,6 +27,7 @@
 \usepackage{makeidx}
 \usepackage{graphicx}
 \usepackage{libtex/thesisStyle}
+\usepackage{float}
 
 
 %%%%%%%%%%%%%
@@ -379,7 +381,6 @@ to locality-aware data structures.
 \cleardoublepage
 
 
-
 \selam
 
 \pagestyle{plain}
@@ -447,7 +448,7 @@ leverage modern multicore architectures to achieve parallelism. However, most ex
 approaches rely on lock-based synchronization mechanisms, which introduce blocking behavior:
 if a thread holding a lock fails or is delayed, other threads waiting on the lock are forced to stall,
 leading to degraded performance.
-While thread failures are relatively rare, they do occur in practice—for example, due to 
+While thread failures are relatively rare, they do occur in practice, for example, due to 
 software bugs in applications using the index or issues in memory management systems. 
 This is especially problematic for mission-critical applications, such as nuclear plant 
 monitoring or gravitational-wave detection in astrophysics, where any delay in data processing 
@@ -481,7 +482,7 @@ in some cases, may not always outperform lock-based approaches when delays and f
 \noindent{\bf Challenges.} 
 Achieving lock-freedom in data series indexes often requires the use of a {\em helping} mechanism,
 where threads are made aware of the work other threads perform and can assist them when
-needed—such as during delays or load imbalances. However, conventional helping mechanisms
+needed, such as during delays or load imbalances. However, conventional helping mechanisms
 tend to be costly and introduce significant overhead~\cite{F04,HS08,7515610,Williams2012CCI}.
 This is one of the reasons the vast majority of the software stack still relies on locks.
 Ensuring lock-freedom while maintaining the good performance of existing data series indexes 
@@ -538,7 +539,7 @@ incurring additional costs.
 %
 ReFreSh introduces the concept of locality-aware lock-freedom, which integrates
 key properties of data locality, high parallelism, low synchronization costs,
-and load balancing—qualities found in many existing parallel data series indexes.
+and load balancing, qualities found in many existing parallel data series indexes.
 None of the conventional lock-free techniques we are aware of have been designed with
 these properties in mind, and our experiments show that using traditional lock-free
 techniques results in a significant performance drop (Graduate Thesis).
@@ -557,20 +558,20 @@ after completing its assigned task. After that, threads synchronize to switch to
 This approach ensures that synchronization and communication costs remain low, similar to the
 original index.
 %
-ReFreSh can be applied to any locality-aware algorithm (Section~\ref{sec:llf}) to create its
-lock-free version. FreSh (Section~\ref{sec:fresh}) follows the design principles of locality-aware
-iSAX-based indexes~\cite{isaxfamily,PFP21-I}, but requires replacing the original index’s data structures
+ReFreSh can be applied to any locality-aware algorithm (Chapter~\ref{chapter:Locality-aware}) to create its
+lock-free version. FreSh (Chapter~\ref{chapter:FreSh}) follows the design principles of locality-aware
+iSAX-based indexes~\cite{isaxfamily,PFP21-I}, but requires replacing the original index data structures
 with lock-free versions that support both expeditive and standard modes. We introduce lock-free
 implementations of several concurrent data structures, including binary trees and priority queues
-(Section~\ref{sec:fresh}), which provide enhanced parallelism compared to existing solutions.
+(Chapter~\ref{chapter:FreSh}), which provide enhanced parallelism compared to existing solutions.
 %
 We believe that these lock-free implementations and the ReFreSh framework can be applied to
 achieve high-performance lock-free versions of various big data processing systems.
 %
 To enable the systematic application of ReFreSh across all processing stages of an iSAX-based index,
-we introduce the abstraction of a traverse object (Section~\ref{sec:traverse}). The traverse object
+we introduce the abstraction of a traverse object (Chapter~\ref{chapter:traverse-object}). The traverse object
 is an abstract data type that offers a generic methodology for designing iSAX-based indexes modularly,
-abstracting the key operations involved in the index’s function. This allows us to provide a
+abstracting the key operations involved in the index function. This allows us to provide a
 formal and flexible approach to designing iSAX-based indexes.
 Specifically, the iSAX-based index can be implemented as a sequence of operations on traverse objects. 
 %
@@ -881,10 +882,10 @@ Odyssey~\cite{odyssey}.
 % 
 The first lock-free concurrent search tree implementation was proposed in~\cite{EFRB10}.
 Building on the ideas from that paper, we develop a baseline algorithm, which we discuss
-and compare experimentally with \textit{FreSh} in Section~\ref{section:evaluation}.
+and compare experimentally with \textit{FreSh} in Section~\ref{chapter:Evaluation}.
 Several other non-blocking concurrent search trees have been introduced in the 
 literature~\cite{BER14, HL16, ABF20, HJ12, NRM20, CNT14, BP12, EFHR14, FR2018, ABF+22}.
-The key novelty of our tree implementation, presented in Section~\ref{sec:fresh}, is its
+The key novelty of our tree implementation, presented in chapter~\ref{chapter:FreSh}, is its
 ability to concurrently perform multiple insert operations in a lock-free manner to
 update the array in a (fat) leaf. Additionally, it supports the expeditive-standard mode
 of execution. These advancements result in improved parallelism and better performance.
@@ -897,7 +898,7 @@ tamir_et_al, LJ13}, none of which are based on sorted arrays or support differen
 execution modes. In our baseline lock-free implementations, we use a skip-list-based
 priority queue~\cite{LJ13}, which has been shown to perform well. However, our experiments
 indicate that the priority queue design we implemented for \textit{FreSh} significantly
-outperforms this approach (Section~\ref{section:evaluation}).
+outperforms this approach (Chapter~\ref{chapter:Evaluation}).
 % 
 Universal constructions~\cite{FK11spaa, FK12ppopp, FK14, FK17opodis, FK09, FK20,
 FKK18, EF+16, FKK22} can provide wait-free or non-blocking concurrent versions of any
@@ -911,36 +912,75 @@ new, as seen in~\cite{SP14, ELM05, GKK06}, though these transformations address 
 problems. The technique used in \textit{FreSh}, called \textit{ReFreSh}  departs from all these
 prior approaches.
 
-\subsection{Data Streams and Timestamps}
-In the context of data streams~\cite{}, timestamps are used to manage sliding windows and to
-ensure that data is processed in a meaningful order. Timestamps can either be explicit
-or implicit, depending on the source of the data and the importance of time in the data's
-semantics. Explicit timestamps are assigned when the exact moment an event occurs is
-significant, such as when dealing with events from a sensor or other real-world sources.
-These timestamps help maintain the integrity of the data's temporal ordering, although
-challenges arise when tuples arrive out of order. While systems can generally expect a
-near-increasing order of timestamps, occasional perturbations necessitate buffering
-or other techniques to reorder the data effectively.
+\subsection{Dynamic Data}  
+In this Master's thesis, we assume that all data is initially stored in memory, but
+only a small subset is used to create the initial index. After the index is built,
+new data arrives dynamically in batches, with the batch size configurable by the user.
+To simulate real-time data ingestion, we introduce a delay interval between consecutive batches.
+This delay, which is also defined by the user, begins as soon as a batch arrives.
 % 
-On the other hand, implicit timestamps are used when the exact time of an event is not
-as critical, but it is important to understand whether the data is recent or old.
-Implicit timestamps are assigned automatically by the system, offering more flexibility
-in managing data, especially when dealing with data from sources that do not naturally
-include timestamps.
+The behavior of the system depends on the interplay between batch size and delay interval.
+If the delay is long enough, index workers (i.e., threads responsible for building the index)
+may fully integrate each batch into the index before the next batch arrives, remaining idle for
+the rest of the time. Conversely, if the delay is short or the batch size is large, new batches
+may arrive before previous ones have been fully processed, leading to overlapping updates and
+concurrent processing.  
 % 
-For systems that need to process composite tuples from multiple streams, such as in the
-case of a join operator, assigning timestamps becomes more complex. One approach is the
-best-effort method, where timestamps are assigned based on when the tuple is produced,
-offering flexibility at the cost of potentially losing deterministic ordering. A stricter
-approach assigns timestamps based on the order of streams and query parameters,
-ensuring a more deterministic output at the cost of potentially increased latency
-due to buffering.
+While index workers are responsible for inserting new data, query workers (i.e., threads
+responsible for answering queries) simultaneously access the same data structures to perform
+exact similarity search. Ensuring correctness in such a system requires a robust mechanism to
+manage concurrent updates and queries. To achieve this, we employ two models inspired by different
+domains of computer science: a \textit{timestamp-based model} and a \textit{consistency model based
+on linearizability}.  
+
+\subsubsection{Timestamp-Based Ordering}  
+
+A well-known approach for handling dynamic data is the use of timestamps to enforce ordering 
+constraints. This method is widely used in database systems to ensure that data is processed
+in a meaningful sequence~\cite{babcock2002}. Notable systems employing timestamp-based mechanisms include
+Apache Kafka, Google Spanner~\cite{kafka2021,spanner2013}.  
 % 
-In our system \textit{DFreSh}, we follow the stricter approach to timestamping, ensuring deterministic
-ordering and precise synchronization across concurrent updates and queries.
-The principles behind this approach are drawn from the work presented 
-in \textit{Models and Issues in Data Stream Systems}~\cite{},
-which guided the design and implementation of timestamps in our dynamic system.
+In our approach, timestamps are implicitly generated using the system's clock. Specifically,
+every batch is assigned a timestamp corresponding to the time when the processing of the batch starts.
+This timestamp plays a crucial role in ensuring query consistency:  
+
+\begin{itemize}  
+    \item Queries must see all data that previous queries have seen.  
+    \item If a query has a later timestamp than an ongoing batch, it must wait for that batch to
+     finish processing before continuing.  
+\end{itemize}  
+% 
+By enforcing this ordering, we ensure that queries always operate on a consistent view of the data.
+Our approach is inspired by the principles outlined in \textit{Models and Issues in Data Stream
+Systems}~\cite{babcock2002}, which guided the design and implementation of timestamps in our dynamic system.  
+
+\subsubsection{Ensuring Correctness Through Linearizability}  
+
+The second approach we employ is inspired by \textit{linearizability}, a key concept in concurrent
+and distributed systems. Linearizability provides a strong consistency guarantee by ensuring
+that all operations appear to execute atomically in a single, consistent order.  
+
+Formally, a system is \textbf{linearizable} if:  
+\begin{itemize}  
+    \item There exists a total order of operations that respects their real-time execution order.  
+    \item Once an operation completes, all subsequent operations observe its effects immediately.  
+\end{itemize} 
+% 
+By leveraging the principles of linearizability, we ensure that concurrent updates and queries
+interact correctly, preserving system correctness while maintaining high concurrency. 
+
+\subsubsection{Relating Timestamp and Linearizability Models}
+
+The Timestamp and Linearizability models complement each other by addressing different aspects
+of correctness in a dynamic, concurrent system. The timestamp model ensures that data is processed
+in a meaningful order, guaranteeing that queries see all data that previous queries have seen,
+respecting the temporal sequence of batch arrivals and processing. However, it does not, by itself,
+ensure that updates and queries across different workers maintain a consistent global order.
+% 
+On the other hand, linearizability ensures that all operations, whether updates or queries, are
+executed atomically and observed in a consistent, real-time order across all threads and workers.
+It guarantees that once an operation completes, its effects are immediately visible to all subsequent
+operations, preserving consistency even in highly concurrent environments.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Traverse Object %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -983,7 +1023,7 @@ in a previous invocation of \textit{Traverse}.
 
 \subsection{Traverse Objects in iSAX-Based Indexing}
 
-\begin{algorithm}[h]
+\begin{algorithm}[htbp]
     \footnotesize
     \vspace*{2mm}
     
@@ -1131,28 +1171,28 @@ refining the query results by computing exact distances and updating the
 \textbf{best-so-far} ($BSF$) value when necessary.
 
 Implementations of \textit{Put} and \textit{Traverse} for $BC$, $TP$, $PS$, and
-$RS$ in FreSh are provided in Section~\ref{}.
+$RS$ in FreSh are provided in chapter~\ref{chapter:FreSh}.
 
 \section{Dynamic iSAX-based Index}
 To enable an iSAX-based index to support dynamic data processing, the traverse object
 requires adaptation. In a dynamic setting, threads work concurrently and independently
 on the two distinct phases of the index. Consequently, the four stages of an iSAX-based
 index, and thus the traverse objects, are now distributed among the workers. \BC\ and \TP\
-are assigned to the index workers—threads dedicated to the creation of the index while 
+are assigned to the index worker's threads dedicated to the creation of the index while 
 \PS\ and \RS\ are assigned to the query workers, which are threads dedicated to answering
 queries.
 % 
 This concurrency between the two phases impacts the procedure for answering queries using
-traverse objects (see Figure \ref{alg:DynamiciSAXTraverse}). The procedure is no longer a
+traverse objects (see Figure \ref{}). The procedure is no longer a
 sequence of four invocations of \Traverse\ on different traverse objects, but is reduced
 to a sequence involving only the last two traverse objects, \PS\ and \RS. This change affects
-the non-overlapping property \ref{def:traverse}, as it can now only be applied to the
+the non-overlapping property \ref{}, as it can now only be applied to the
 \Traverse\ objects of the same phase (\BC, \TP\ and \PS, \RS), because \Traverse\ and
 \Put\ can occur concurrently during the Index Creation and Query Answering phases.
 % 
 Due to the dynamic data processing, some of the data structures that implement the traverse
 objects, such as \BC\ and \PS, need re-initialization before processing the next part of the
-data (see Algorithm \ref{alg:DynamicISAXTraverse:reuse}). This is necessary because in a
+data (see Algorithm \ref{}). This is necessary because in a
 dynamic setting, index workers performing \Traverse\ on \TP\ need to know if the data there
 is obsolete. Query workers have the same requirement while traversing \PS.
 % 
@@ -1160,14 +1200,14 @@ In our approach, the data structure (specifically, the summarization buffers) is
 by a sequence number. During re-initialization, each index worker first resets its size to 0,
 then increments its sequence number by one. This allows an index worker performing
 \Traverse\ on \TP\ to determine if the data is obsolete by checking the size and sequence number
-(see Algorithm line \ref{alg:DynamicISAXTraverse:reuse}).
+(see Algorithm line \ref{}).
 % 
 Additionally, to support dynamic processing, both types of workers need to perform certain
-preparations. In lines \ref{alg:DynamiciSAXTraverse:updates-to-process-Start}-
-\ref{alg:DynamiciSAXTraverse:updates-to-process-End}, index workers repeatedly execute the
+preparations. In lines \ref{}-
+\ref{}, index workers repeatedly execute the
 sequence of traverse objects \BC\ and \TP, and then re-initialize the traverse object \BC.
 To simulate a setting where data arrives dynamically, workers wait when no data is available,
-as shown in line \ref{alg:DynamiciSAXTraverse:no-update-yet}.
+as shown in line \ref{}.
 
 TODO: Describe the two models, SYSTEM AND LOGICAL TIMESTAMPS. ReWrite the PSEYDOCODE
 % On the other hand, query workers are responsible for fixing the system's sequence number,
@@ -1179,6 +1219,14 @@ TODO: Describe the two models, SYSTEM AND LOGICAL TIMESTAMPS. ReWrite the PSEYDO
 % simulating the arrival of incoming data (line \ref{alg:DynamiciSAXTraverse:nextUpdate}).
 
 
+\chapter{Locality-aware}
+\label{chapter:Locality-aware}
+
+\chapter{FreSh}
+\label{chapter:FreSh}
+
+\chapter{Evaluation}
+\label{chapter:Evaluation}
 
 
 
