@@ -1173,50 +1173,168 @@ refining the query results by computing exact distances and updating the
 Implementations of \textit{Put} and \textit{Traverse} for $BC$, $TP$, $PS$, and
 $RS$ in FreSh are provided in chapter~\ref{chapter:FreSh}.
 
-\section{Dynamic iSAX-based Index}
-To enable an iSAX-based index to support dynamic data processing, the traverse object
-requires adaptation. In a dynamic setting, threads work concurrently and independently
-on the two distinct phases of the index. Consequently, the four stages of an iSAX-based
-index, and thus the traverse objects, are now distributed among the workers. \BC\ and \TP\
-are assigned to the index worker's threads dedicated to the creation of the index while 
-\PS\ and \RS\ are assigned to the query workers, which are threads dedicated to answering
-queries.
-% 
-This concurrency between the two phases impacts the procedure for answering queries using
-traverse objects (see Figure \ref{}). The procedure is no longer a
-sequence of four invocations of \Traverse\ on different traverse objects, but is reduced
-to a sequence involving only the last two traverse objects, \PS\ and \RS. This change affects
-the non-overlapping property \ref{}, as it can now only be applied to the
-\Traverse\ objects of the same phase (\BC, \TP\ and \PS, \RS), because \Traverse\ and
-\Put\ can occur concurrently during the Index Creation and Query Answering phases.
-% 
-Due to the dynamic data processing, some of the data structures that implement the traverse
-objects, such as \BC\ and \PS, need re-initialization before processing the next part of the
-data (see Algorithm \ref{}). This is necessary because in a
-dynamic setting, index workers performing \Traverse\ on \TP\ need to know if the data there
-is obsolete. Query workers have the same requirement while traversing \PS.
-% 
-In our approach, the data structure (specifically, the summarization buffers) is accompanied
-by a sequence number. During re-initialization, each index worker first resets its size to 0,
-then increments its sequence number by one. This allows an index worker performing
-\Traverse\ on \TP\ to determine if the data is obsolete by checking the size and sequence number
-(see Algorithm line \ref{}).
-% 
-Additionally, to support dynamic processing, both types of workers need to perform certain
-preparations. In lines \ref{}-
-\ref{}, index workers repeatedly execute the
-sequence of traverse objects \BC\ and \TP, and then re-initialize the traverse object \BC.
-To simulate a setting where data arrives dynamically, workers wait when no data is available,
-as shown in line \ref{}.
+\subsection{Adapting the Traverse Object for Dynamic Data Processing}  
 
-TODO: Describe the two models, SYSTEM AND LOGICAL TIMESTAMPS. ReWrite the PSEYDOCODE
-% On the other hand, query workers are responsible for fixing the system's sequence number,
-% which is crucial for maintaining the system's correctness (more details in Section \ref{sec:dynamic}).
-% Similar to index workers, query workers repeatedly perform the sequence of traverse objects
-% \PS\ and \RS\ for each query and finally re-initialize the traverse object \PS\ 
-% (Algorithm \ref{alg:DynamiciSAXTraverse} Lines \ref{alg:DynamiciSAXTraverse:Query-Start}-
-% \ref{alg:DynamiciSAXTraverse:Query-End}). Additionally, query workers are responsible for
-% simulating the arrival of incoming data (line \ref{alg:DynamiciSAXTraverse:nextUpdate}).
+To support dynamic data processing in an iSAX-based index, the
+\textit{traverse object} requires adaptation. In a dynamic setting,
+threads execute concurrently and independently across the two distinct phases
+of the index: \textit{index creation} and \textit{query answering}.
+Consequently, the \BC\ and \TP\ traverse objects are assigned to the
+\textit{index workers} (threads responsible for constructing the index), while
+the \PS\ and \RS\ traverse objects are assigned to the \textit{query workers}
+(threads responsible for answering queries).  
+
+\subsubsection{Impact of Concurrency on Traverse Objects}  
+
+The concurrent execution of these phases alters the procedure for answering
+queries using traverse objects (see Algorithm~\ref{alg:DynamiciTraverseObject}).
+Unlike the static setting, where the procedure involves four sequential
+invocations of \Traverse\ (one for each traverse object), in the dynamic
+setting, the sequence is reduced to only the last two traverse objects,
+\PS\ and \RS.  
+
+This change directly affects the \textit{non-overlapping property}
+(Definition~\ref{def:non-overlapping}), which now applies only to traverse
+objects within the same phase:  
+\begin{itemize}  
+    \item \textbf{Index workers:} \BC\ and \TP  
+    \item \textbf{Query workers:} \PS\ and \RS  
+\end{itemize}  
+
+Since \Traverse\ and \Put\ operations can occur concurrently across phases,
+situations arise where an index worker inserts new elements into the iSAX tree
+while query workers are simultaneously pruning or refining their results.
+This requires additional mechanisms to maintain correctness.  
+
+\subsubsection{Handling Multiple Batches}  
+
+In a dynamic environment where data arrives in batches, certain data structures
+implementing traverse objects—specifically, \BC\ and \PS—must be
+\textit{re-initialized} before processing a new batch. This re-initialization
+is necessary because:  
+\begin{itemize}  
+    \item Each batch reuses the same buffers, meaning helpers must distinguish
+    between \textbf{current} and \textbf{obsolete} data.  
+    \item Helpers need to \textbf{skip outdated data} that no longer belongs to
+    the active batch.  
+    \item This differentiation is particularly important during the traversal of
+    \TP\ and \PS\ objects.  
+\end{itemize}  
+
+\subsubsection{Ensuring Correctness with Sequence Numbers}  
+
+To address these challenges, our approach introduces \textit{sequence numbers}
+as a mechanism to track the state of the algorithm.  
+
+\begin{definition}  
+A \textbf{sequence number} is a monotonically increasing integer used to track  
+the order of operations and ensure consistency in multi-threaded or
+distributed environments.  
+\end{definition}  
+
+Each \textit{summarization buffer} is associated with a sequence number.
+During \textbf{re-initialization}, an index worker performs the following steps:  
+\begin{enumerate}  
+    \item Resets the buffer size to zero.  
+    \item Increments the buffer's sequence number by one.  
+\end{enumerate}  
+
+This mechanism prevents a thread from processing outdated data. If a worker reads
+a nonzero buffer size, it indicates the presence of data. However, before proceeding,
+the worker also checks the \textbf{sequence number}:  
+\begin{itemize}  
+    \item If the sequence number \textbf{matches} the current batch ID,
+     the data is valid and can be processed.  
+    \item If the sequence number is \textbf{smaller} than the current batch ID,
+     the data is obsolete and must be ignored.  
+\end{itemize}  
+
+This ensures that no worker mistakenly processes data from a previous batch
+(see Algorithm~\ref{alg:BufferReuse}).  
+
+
+\begin{algorithm}[htbp]
+    \footnotesize
+    \vspace*{2mm}
+    
+    \begin{algorithmic}[1]
+    
+    \Procedure{InitializeSharedObjects}{}
+        \State \BC $\gets$ initially contains all raw data series
+        \State \TP, \PS, \RS $\gets$ initially empty
+        \State $\mathit{BSF} \gets$ some initial value
+        \State $\mathit{NextUpdateAvailable} \gets 0$
+        \State $\mathit{GlobalSeq} \gets 0$
+    \EndProcedure
+    
+    \vspace*{1mm}
+    \State{Code for thread $t_i$, $i \in \{0, \ldots, k-1\}$:}    
+    \vspace*{1mm}
+    
+    \Procedure{IndexCreation(int $\mathit{TotalUpdates}$) \textbf{returns} int}{}
+        \State int $\mathit{currentBatch} \gets 1$
+        \While{$\mathit{currentBatch} < \mathit{TotalBatches}$}
+            \If{$\mathit{model} == \mathit{SystemTS}$ }
+                \State batchTS $\gets$ getTS()
+            \EndIf
+            \State \BC.\Traverse(\&BufferCreation(), $\mathit{BCParam}$, \False)
+            \State \TP.\Traverse(\&TreePopulation(), $\mathit{TPParam}$, \False)
+            \ForAll{summarization buffers that have data}
+                \State ReuseBuffers($\mathit{summBuffer}, \mathit{currUpdate}$)
+            \EndFor
+            \If{$\mathit{DELAY} >= \mathit{BatchProcessingTime}$}
+                \State sleep($\mathit{DELAY}-\mathit{BatchProcessingTime}$)
+            \EndIf
+            \State $\mathit{currentBatch} \gets \mathit{currentBatch} + 1$
+        \EndWhile
+    \EndProcedure
+    
+    \vspace*{1mm}
+    \State{Code for thread $t_i$, $i \in \{k, \ldots, n-1\}$:}    
+    \vspace*{1mm}
+    
+    \Procedure{QueryAnswering(QuerySeriesSet $\mathit{SQ}$) \textbf{returns} int}{}
+        \State int $\mathit{localTS} \gets 0$
+        \While{$\mathit{!SQ.Empty}$}
+            \If{$\mathit{model} == \mathit{LogicalTS}$}
+                \If{$\mathit{localSeq} == \mathit{GlobalSeq}$}
+                    \State \CAS(\&GlobalSeq, localSeq, localSeq + 1)
+                \EndIf
+            \ElsIf{$\mathit{model} == \mathit{SystemTS}$}
+                \State queryTS $\gets$ getTS()
+                \While {$\mathit{queryTS} >= \mathit{batchTS}$}
+                    \State backoff()
+                \EndWhile
+            \EndIf
+            \State \PS.\Traverse(\&Pruning(), $\mathit{PSParam}$, \False)
+            \State \TP.\Traverse(\&Refinement(), $\mathit{RSParam}$, \False)
+            \ForAll{summarization buffers that have data}
+                \State ReuseBuffers($\mathit{summBuffer}, \mathit{currUpdate}$)
+            \EndFor
+            
+            \If{$\mathit{model} == \mathit{LogicalTS}$}
+                \State $\mathit{localSeq} = \mathit{localSeq} + 1$            
+            \EndIf
+        \EndWhile
+        \State \Return $\mathit{BSF}$
+    \EndProcedure
+    
+    \vspace*{1mm}
+    \Procedure{ReuseSumBuffers(SumBuff * $\mathit{currBuff}$, int $\mathit{currentBatch}$)}{} \label{alg:BufferReuse}
+
+        \State $\mathit{currBuff->size[workerID]} \gets 0$
+        \If{$\mathit{currBuff->seq[workerID]} < \mathit{currentBatch}$}
+            \State $\mathit{currBuff->seq[workerID]} \gets \mathit{currentBatch}$
+        \EndIf
+        \State $\mathit{currBuff->seq[workerID]++}$
+    \EndProcedure
+    
+    \end{algorithmic}
+    
+    \caption{Implementation of a dynamic iSAX-based index using the traverse objects \BC, \TP.}
+    \label{alg:DynamiciTraverseObject}
+    \end{algorithm}
+
 
 
 \chapter{Locality-aware}
