@@ -4,7 +4,7 @@
 \usepackage{algo}
 % \usepackage[named]{libtex/algo}
 \usepackage{algorithm}
-\usepackage{algpseudocode}
+\usepackage[noend]{algpseudocode}
 \usepackage{amssymb}
 \usepackage{amsthm}
 \setcounter{tocdepth}{3}
@@ -36,6 +36,9 @@
 %%%%%%%%%%%%%
 
 \newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newcommand{\rb}[1]{{\color{red} #1}\normalcolor}
 
 \newcommand{\CAS}{\mbox{\textit{CAS}}}
 \newcommand{\FAI}{\mbox{\textit{FAI}}}
@@ -82,6 +85,10 @@
 \newcommand{\PS}{\mbox{$\mathit{PS}$}}
 \newcommand{\RS}{\mbox{$\mathit{RS}$}}
 \newcommand{\RawData}{\mbox{$\mathit{RawData}$}}
+\newcommand{\Refresh}{\mbox{$\mathit{ReFreSh}$}}
+\newcommand{\Fresh}{\mbox{$\mathit{FreSh}$}}
+
+
 
 
 
@@ -1656,6 +1663,658 @@ multiple dynamic batches while ensuring that execution mode transitions occur on
 
 \chapter{FreSh}
 \label{chapter:FreSh}
+
+We follow the data processing flow, described in Chapter~\ref{chapter:traverse-object},
+employ $\mathit{BC}$, $\mathit{TP}$, $\mathit{PS}$, and $\mathit{RS}$ (from Section~\ref{chapter:traverse-object}),
+and repeatedly apply \textit{ReFreSh} (from Section~\ref{chapter:Locality-aware}) to come up with \textit{FreSh},
+the first lock-free locality-aware data series index.
+
+\subsection{Counter Object}
+
+\rb{Not sure if we have to include this!!!! Found it on old versions}
+
+
+Many of our implementations use a {\em counter object}, which supports the
+operation \NextIndex\ (Algorithm~\ref{alg:counter}) which returns a positive integer. 
+Let \NextIndex\ be invoked $K$ times.
+If crashes do not occur, every index in the range $R = 
+\{0, \ldots, K-1\}$ should be returned exactly once; 
+(i.e. by a distinct of the $K$ invocations) each integer 
+is returned exactly once otherwise, as many indexes from $R$,
+as the number of crashed  threads, 
+are not returned, but the rest are returned exactly once.
+
+Algorithm~\ref{alg:counter} uses two counters. The first, $\mathit{cntEM}$,
+is used in the expeditive mode and is updated by simple writes
+(line~\ref{alg:co:em:inc-elements}),
+whereas the second, $\mathit{cntSM}$, is used in the standard mode and
+is updated using \FAI\ (line~\ref{alg:co:FAI-pos}).
+As long as no helpers exist ($\mathit{h = \False}$), the owner thread $t$ executes 
+a code similar to the sequential code implementing a counter (lines~\ref{alg:co:em:acquire-pos}-
+\ref{alg:co:em:checkh1}). When a helper arrives, it sets $\mathit{cntSM}$ to the current
+value of $cntEM$ (lines~\ref{alg:co:em:ownerFlag}, \ref{alg:co:em:cntSM-init}),
+and uses \FAI\ on $\mathit{cntSM}$ (line~\ref{alg:co:FAI-pos}) to get assigned new indexes. 
+
+Lines~\ref{alg:co:em:elements-bot}-\ref{alg:co:FAI-pos} provide a mechanism for appropriately
+synchronizing $t$ with the helper threads when they arrive. Assume that $t$ has read the
+value $x$ in $\mathit{cntEM}$, and it is ready to write $x+1$ in $\mathit{cntEM}$,
+when two helper threads $t_h$ and $t'_h$ arrive.
+Thread $t_h$ reads $x$ in $\mathit{cntEM}$, then $t$ writes $x+1$ 
+in $\mathit{cntEM}$ and $t'_h$ reads  $x+1$ in $\mathit{cntEM}$.
+Depending on which of the two values will be written in $\mathit{cntSM}$
+and the order in which the \FAI\ instructions will be executed, 
+one of $t_h$, $t'_h$ may read $x$ in $\mathit{cntSM}$ and return it.
+% 
+In this case, $t$ should avoid returning $x$ a second time (to ensure the semantics of
+a counter object). To achieve this, helpers record in $\mathit{first}$ the value with
+which they initialize $\mathit{cntSM}$. 
+% 
+If $t$ discovers that helpers exist (lines~\ref{alg:co:em:checkh1},~\ref{alg:co:em:ownerFlag}), 
+%is the thread to successfully execute the \CAS\ of line~\ref{27}, it stores
+%the value $x+1$ there, so helper threads will return this or higher values. 
+%In this case, it is safe for $t$ to return $x$ (line~\ref{28}).
+%Otherwise, $t$ 
+it may have to read $\mathit{first}$ to figure out which is the first value recorded
+in $\mathit{cntSM}$. If it is $x$, it  retries
+(line~\ref{alg:co:em:continue2}). Note that helpers should first agree on the value 
+to record in $\mathit{cntSM}$ with the \CAS\ of line~\ref{alg:co:em:casfirst} and then all 
+use this value to initialize $\mathit{cntSM}$ (lines~\ref{alg:co:em:pos2}-~\ref{alg:co:em:cntSM-init}).
+
+
+\begin{algorithm}[t]
+    \footnotesize
+    \caption{Pseudocode for \NextIndex.}
+    \label{alg:counter}
+    \begin{algorithmic}[1]
+
+        \State \textbf{Shared variables:}
+        \State int $\mathit{cntEM}$ (initially $0$), $\mathit{cntSM}$ (initially $\bot$)
+
+        \vspace{2mm}
+
+        \Function{NextIndex}{$\mathit{*h}$} \textbf{returns} $\langle \mathit{int, \Boolean} \rangle$
+            \State int $\mathit{pos}$
+            \State int $\mathit{ownerFlag} \gets \False$
+            
+            \While{\True}
+                \If{$\mathit{*h = \False}$} \label{alg:co:em}
+                    \State $\mathit{pos} \gets \mathit{cntEM}$ \label{alg:co:em:acquire-pos}
+                    \If{$\mathit{*h == \True}$} 
+                        \State \textbf{continue} \label{alg:co:em:continue1}
+                    \EndIf
+                    \State $\mathit{cntEM} \gets \mathit{cntEM}+1$ \label{alg:co:em:inc-elements}
+                    \If{$\mathit{*h == \False}$} 
+                        \State \Return $\langle pos, \True \rangle$ \label{alg:co:em:checkh1}
+                    \EndIf
+                    \State $\mathit{ownerFlag} \gets \True$ \label{alg:co:em:ownerFlag}
+                \EndIf
+
+                \If{$\mathit{cntSM = \bot}$} \label{alg:co:em:elements-bot}
+                    \If{$\mathit{ownerFlag \neq \True}$} \label{alg:co:em:ifHelper}
+                        \State $\mathit{pos} \gets \mathit{cntEM}$ \label{alg:co:em:ownerFlag1}
+                        \State $\mathit{\CAS(first, \bot, pos)}$ \label{alg:co:em:casfirst}
+                        \State $\mathit{pos} \gets first$ \label{alg:co:em:pos2}
+                    \EndIf
+                    \State $\mathit{v} \gets \CAS(cntSM, \bot, pos)$ \label{alg:co:em:cntSM-init}
+                    \If{$\mathit{v == \bot}$ \textbf{and} $\mathit{ownerFlag = \True}$}
+                        \State \Return $\langle pos, \False \rangle$ \label{alg:co:em:ifOwner}
+                    \ElsIf{$\mathit{first < cntEM}$} 
+                        \State \textbf{continue} \label{alg:co:em:continue2}
+                    \EndIf
+                \EndIf
+
+                \State $\mathit{pos} \gets \FAI(\mathit{cntSM})$ \label{alg:co:FAI-pos}
+                \State \Return $\langle pos, \False \rangle$ \label{alg:co:em:return}
+            \EndWhile
+
+        \EndFunction
+
+    \end{algorithmic}
+\end{algorithm}
+
+
+
+\subsection{Buffers Creation and Tree Population} 
+\label{sec:buffers_and_tree}
+
+\BC\ is implemented using a single buffer, called \RawData.
+In \BC, \Put\ is never used, as we assume that the data are initially in \RawData.
+% 
+To implement \Traverse, we employ \Refresh.  
+We split \RawData\ into $k$ equally-sized {\em chunks} of consecutive 
+elements , $w_1, \ldots, w_k$. This way we have a number of 
+$k$ workloads. 
+Threads use a counter object to get assigned chunks to process.
+To reduce the cost of helping, \Fresh\ calls \Refresh\ recursively.
+Specifically, it splits each chunk into smaller parts,
+called {\em groups}, and employ \Refresh\ a second time for processing the groups of a chunk.
+% 
+In more detail, \Fresh\ maintains an additional counter object 
+for each chunk of $RawData$. 
+Each thread $t$ that acquires or helps a chunk, uses the counter object of the chunk to acquire
+{\em groups} in the chunk to process. \Fresh\ also applies a third level of \Refresh\ recursion,
+where each workload is comprised of the processing of just a single element of a group. 
+
+Pseudocode for \BC.\Put\ and \BC.\Traverse\ is provided 
+in Algorithm~\ref{alg:bc}. \RawData\ is comprised of $k$ chunks,
+each containing $m$ groups. Moreover, each group contains $r$ elements (line~\ref{alg:bc:r}). 
+\Fresh\ uses three sets of done flags, $\mathit{DChunks}$, $\mathit{DGroups}$,
+and $\mathit{DElements}$ (line~\ref{alg:bc:c}), storing one done flag for each chunk,
+for each group, and for each element, respectively.
+% 
+Similarly, \Fresh\ employs three sets of counter objects, $\mathit{Chunks}$, $\mathit{Groups}$,
+and $\mathit{Elements}$ (line~\ref{alg:bc:e}), to count the chunks, groups and elements, assigned
+to threads for processing. 
+%
+\Fresh\ also employs two sets of {\em helping} flags (line~\ref{alg:bc:h}), 
+$\mathit{HChunks}$  (for helping chunks) and $\mathit{HGroups}$ (for helping groups). 
+For each $1 \leq i \leq k$, $\mathit{HChunks[i]}$ identifies whether there are helpers for chunk $i$.
+Similarly, for each $1 \leq j \leq m$, $\mathit{HGroups[i][j]}$ identifies whether there are helpers
+for group $j$ of chunk $i$. 
+
+% 
+In an invocation of
+\Traverse(\&\BufferCreation, \RawData, $\mathit{Dchunks}$, $\mathit{DGroups}$, $\mathit{DElements}$,
+$\mathit{HChunks}$, $\mathit{HGroups}$, \False, $\mathit{Chunks}$, $\mathit{Groups}$, $\mathit{Elements}$, $1$),
+$h$ is equal to \False. By the way a counter object works, it follows that 
+no expeditive mode is ever executed at the first level of the recursion.
+Note that at this level, the roles of $D_1$ and $H_1$ are played by the one-dimensional arrays
+$DChunks$ and $HChunks$, respectively. Moreover, $DGroups$ and $DElements$ play the role of $D_2$ and $D_3$,
+respectively, and $HGroups$ plays the role of $H_2$. Each chunk is processed by recursively calling
+\Traverse\ ({\em level-2 recursion}) on line~\ref{alg:bc:recur} (with $\mathit{rlevel}$ being equal to $2$). 
+The goal of a level-2 invocation of \Traverse\
+is to process an entire chunk by splitting it into groups and calling
+\Traverse\ once more ({\em level-3 recursion}) to process the elements of each group 
+(recursive call of line~\ref{alg:bc:recur} with $\mathit{rlevel}$ being equal to $3$). 
+Note that in a level-2 invocation corresponding to some chunk $i$, 
+\RawData\ is the two-dimensional array containing the elements of the groups of chunk $i$.
+Moreover, the role of $D_1$ is now played by the one-dimensional array $DGroups[i]$, 
+and the role of $D_2$ by the two-dimensional array $DElements[i]$,
+whereas $D_3$ is no longer needed and is $\mathit{NULL}$.
+The role of $H_1$ is now played by the one-dimensional array $HGroups[i]$. 
+Helping (lines~\ref{alg:bc:scan:for}-\ref{alg:bc:help:c:true}) follows the general pattern
+described in Algorithm~\ref{alg:refresh}. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PSEYDOCODE%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{algorithm}[t]
+    \footnotesize
+    \vspace*{2mm}
+
+    \begin{algorithmic}[1]
+    
+    \State \textbf{Shared variables:}
+    \State Set $\mathit{RawData}[1..k][1..m][1..r]$, initially containing all data series \label{alg:bc:r}
+    \State \textbf{Boolean} $\mathit{DChunks}[1..k]$, $\mathit{DGroups}[1..k][1..m]$, $\mathit{DElements}[1..k][1..m][1..r]$, initially all \textbf{False} \label{alg:bc:c}
+    \State \textbf{Boolean} $\mathit{HChunks}[1..k]$, $\mathit{HGroups}[1..k][1..m]$, initially all \textbf{False} \label{alg:bc:h}
+    \State CounterObject $\mathit{Chunks}$, $\mathit{Groups}[1..k]$, $\mathit{Elements}[1..k][1..m]$ \label{alg:bc:e}
+    \State \textbf{int} $\mathit{Size}[1..3] = \{k,m,r\}$
+
+    \vspace*{1mm}
+    \State \textbf{Code for each thread:}
+
+    \Procedure{Traverse}{Function *BufferCreation, DataSeries $\mathit{RawData}[]$, Boolean $\mathit{D_1}[]$, Boolean $\mathit{D_2}[]$, Boolean $\mathit{D_3}[]$, Boolean $\mathit{H_1}[]$, Boolean $\mathit{H_2}[]$, Boolean $h$, CounterObject $Cnt_1$, CounterObject $Cnt_2[]$, CounterObject $Cnt_3[]$, int $\mathit{rlevel}$}
+        \State \textbf{int} $\mathit{i}$
+        \While{\textbf{True}} \label{alg:bc:while:start}
+            \State $\langle i, * \rangle \gets Cnt_1.\NextIndex(\&h)$
+            \If{$i > \mathit{Size}[rlevel]$} \textbf{break} \EndIf
+            \State Mark $\mathit{RawData[i]}$ as acquired
+            \If{$rlevel < 3$}
+                \State Traverse($\mathit{BufferCreation, RawData[i], D_2[i], D_3[i], D_3[i], H_2[i],}$
+                \Statex \quad $\mathit{NULL, H_1[i], Cnt_2[i], Cnt_3[i], Cnt_3[i], rlevel+1}$) \label{alg:bc:recur}
+            \Else
+                \State $*$\Call{BufferCreation}{$RawData[i]$}
+            \EndIf
+            \State $\mathit{D_1[i]} \gets \textbf{True}$ \label{alg:bc:c:true}
+        \EndWhile
+
+        \ForAll{$j$ such that $\mathit{D_1[j]}$ is \textbf{False}} \label{alg:bc:scan:for}
+            \State Backoff() \Comment{Avoid helping if possible} \label{alg:bc:help:backoff}
+            \If{$\mathit{D_1[j]}$ is \textbf{False}} \label{alg:bc:help:if}
+                \State $\mathit{H_1[j]} \gets \textbf{True}$ \label{alg:bc:h:true}
+                \If{$rlevel < 3$}
+                    \State Traverse($\mathit{BufferCreation, RawData[j], D_2[j], D_3[j], D_3[j], H_2[j],}$
+                    \Statex \quad $\mathit{NULL, H_1[j], Cnt_2[j], Cnt_3[j], Cnt_3[j], rlevel+1}$) \label{alg:bc:help:process}
+                \Else
+                    \State $*$\Call{BufferCreation}{$RawData[j]$}
+                \EndIf
+                \State $\mathit{D_1[j]} \gets \textbf{True}$ \label{alg:bc:help:c:true}
+            \EndIf
+        \EndFor
+    \EndProcedure
+
+    \end{algorithmic}
+
+    \caption{Pseudocode for \textsc{Traverse} in \textsc{FreSh}. Code for thread $t$.}
+    \label{alg:bc}
+\end{algorithm}
+
+The backoff time in \Fresh\ depends on the average execution time required by each
+thread to process a group. Each thread $\mathit{t}$ counts the average time 
+$T_{avg}$ it has spent to process all the parts it acquired, and whenever
+it encounters a group to help, it sets the backoff time to be proportional
+to $T_{avg}$ and performs helping only after backoff, if it is still needed.
+This allows an owner thread that has not crashed, to finish the processing of its last chunk,
+while it still executes in expeditive mode, thus avoiding the cost of switching
+to and executing a standard mode.
+% 
+\Fresh\ implements \TP\ using a set of $2^w$ summarization buffers
+($w$ is the number of segments of an iSAX summary),one for each bit sequence of $w$ bits.
+To decide to which summarization buffer to store a pair,
+\Fresh\ (as other iSAX-based indexes) 
+examines the bit sequence consisting of the first bit of each 
+of the $w$ segments of the pair's iSAX summary, 
+and places the pair into the corresponding summarization buffer. 
+Each of the summarization buffers is split into $N$ parts, one for each of the $N$ threads in the system.
+Each thread uses its own part in each buffer to store the elements it inserts.
+
+
+\noindent
+{\bf Tree Population Stage.}
+Similarly to the buffers creation stage, in tree population, the worker threads
+have to traverse and process the elements of \TP, i.e. all pairs added in the summarization buffers.
+Processing is now achieved by calling the \TreePopulation\ function (Algorithm~\ref{alg:iSAXTraverse})
+for each pair. \TreePopulation\ finds the right subtree of the index tree to place each pair, and then 
+simply calls \PS.\Put\ to add the pair into \PS, the next traverse object in the dataflow pipeline. 
+% Recall that \TP.\Put\ is implemented by calling \MBInsert\ (Algorithm~\ref{alg:mb}).
+To implement \TP.\Traverse, we split the elements of \TP\ into $2^w$ workloads 
+as the number of summarization buffers, and apply \Refresh.
+%,
+Each thread $\mathit{t}$ repeatedly acquires summarization buffers using \FAI,
+and process them to produce the corresponding trees. 
+% 
+Each summarization buffer could be further split into chunks and groups, and \Refresh\ could be called recursively.
+Pseudocode for \Traverse\ of \TP\ closely follows that for \BC.
+\BC\ and \TP\ are lock-free implementations of a traverse object. 
+
+\subsection{Prunning and Refinement}
+
+In \Fresh, \PS\ is implemented as a forest of $2^w$ leaf-oriented trees,
+one for each of the summarization buffers. 
+The trees of the forest are the root subtrees of a standard iSAX-based tree.
+\TreePopulation\ simply transfers the pairs from a summarization buffer
+to the appropriate subtree of the index tree. 
+To support the concurrent population of a subtree by multiple threads, 
+\Fresh\ utilizes Algorithm~\ref{alg:tree} 
+%presented in Section~\ref{sec:trees}. % (and discussed later). 
+%Specifically, the \Put\ operation of \PS\ (see Algorithm~\ref{alg:ps}) is implemented
+%by simply calling \TreeInsert\ (Algorithm~\ref{alg:tree}). Whenever this routine
+%is called by a thread that process an originally assigned summarization buffer, 
+%it should have its $\mathit{isHelper}$ argument equal to $\False$,
+%whereas when it is called by a thread that helps, it should have this argument equal to $\True$.
+%
+To implement \PS.\Traverse, \Fresh\ (Algorithm ~\ref{alg:ps}) uses \Refresh\ to process 
+the different subtrees of the index tree. Specifically, 
+each thread $t$ access a counter to get assigned a subtree $T$ to process.
+To process the nodes of $T$, \Refresh\ is applied recursively. % (line~\ref{alg:ps:help:c:rec}). 
+%Specifically, the threads working on $T$ %(owner and helpers) 
+%use a counter to get assigned nodes in $T$.
+A thread $t$ that is assigned node $i$ of $T$,
+first searches for the $i$-th node, according to inorder,
+and then processes it by invoking the \Prunning\ function %(line~\ref{alg:ps:prunning}) 
+of Algorithm~\ref{alg:iSAXTraverse}. 
+%As soon as $t$ figures out that all nodes of $T$ have been assigned for processing, 
+%it re-traverses the nodes of $T$,
+%checking their done flags to figure out whether there are nodes 
+%whose processing has not been completed yet, and helps
+%whenever it is needed. Similarly, when $t$ figures out that all subtrees have been
+%assigned for processing, it examines the done flags of the subtrees to figure out
+%whether there are subtrees whose processing has not yet been completed, and it helps if needed. 
+%
+%Pseudocode for implementing \Traverse\ of \PS\ is provided in .
+To find the $i$-th node of $T$ in an efficient way, 
+for each node $nd$ of $T$, \Fresh\ maintains a counter
+$\mathit{cnt_{nd}}$ that counts the number of nodes in the left subtree
+of $\mathit{nd}$. \Fresh\ %(lines~\ref{alg:ps:help:c:treenode-start}-\ref{alg:ps:help:c:treenode-end})
+uses these counters to find the $i$-th node of $T$ by simply traversing a path in $T$.
+The total number of nodes in T is calcualted by simply traversing the righmost path of
+$T$ and summing up the counters stored in the traversed nodes.
+%Pseudocode for \FindNode\ and \TotalNodes\ is provided in Algorithm~\ref{alg:ps}.
+%\here{It is unclear to which algorithm the line numbers above refer.}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Pseudocode for PRUNNING %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{algorithm}[htbp]
+    \footnotesize
+    \vspace*{2mm}
+    
+    \begin{algorithmic}[1]
+    
+    \State \textbf{Shared variables:}
+    \State TreeNode *$\mathit{IndexTree}[1..2^w]$ \label{alg:ps:r}
+    \State \textbf{bool} $\mathit{DTree[1..2^w]}$, $\mathit{HTree[1..2^w]}$, initially all \textbf{false} \label{alg:ps:c}
+    \State CounterObject $\mathit{TreeCnt[1..2^w]}$
+    
+    \vspace*{1mm}
+    \Procedure{Traverse}{Function *\Prunning, TreeNode *$T$, CounterObject *$\mathit{Cnt}$, 
+        int $x$, bool $h$, int $\mathit{rlevel}$}
+        \State int $\mathit{i}$
+    
+        \While{\textbf{true}}
+            \State $\mathit{\langle i, * \rangle = Cnt.\NextIndex(\&h)}$ \label{alg:ps:help:c:cnt}
+            \If{$\mathit{i > x}$}
+                \State \textbf{break}
+            \EndIf
+            \If{$\mathit{rlevel < 2}$}
+                \State \textbf{mark} $\mathit{IndexTree[i]}$ as acquired
+                \State $\mathit{totalNds} \gets$ \Call{TotalNodes}{$\mathit{IndexTree[i]}$}
+                \State Traverse($\mathit{Prunning, IndexTree[i], TreeCnt[i], totalNds,}$
+                \Statex \quad $\mathit{\textbf{false}, rlevel+1}$) \label{alg:ps:help:c:rec}                
+                \State $\mathit{DTree[i] := \textbf{true}}$ \label{alg:ps:help:c:true}
+            \Else
+                \State $\mathit{nd} \gets$ \Call{FindNode}{$\mathit{T,i}$} \label{alg:ps:findnode}
+                \State \textbf{mark} $\mathit{nd}$ as acquired
+                \State \Call{\Prunning}{$\mathit{nd}$} \label{alg:ps:prunning}
+                \State \textbf{mark} $\mathit{nd}$ as done
+            \EndIf
+        \EndWhile
+    
+        \ForAll{$j$ such that $\mathit{DTree[j]}$ is \textbf{false}} \label{alg:ps:scan:for}
+            \State \Call{Backoff}{} \Comment{Avoid helping, if possible} \label{alg:ps:help:backoff}
+            \If{$\mathit{DTree[j]} == \textbf{false}$} \label{alg:ps:help:if}
+                \State $\mathit{HTree[j] := \textbf{true}}$ \label{alg:ps:h:true}
+                \State \Call{HelpTree}{\Prunning, $\mathit{IndexTree[j]}$}
+            \EndIf
+            \State $\mathit{DTree[j] := \textbf{true}}$ \label{alg:ps:help:c:true:helping}
+        \EndFor
+    \EndProcedure
+    
+    \vspace*{1mm}
+    \Procedure{FindNode}{TreeNode *$T$, int $i$} \Comment{Returns TreeNode*} \label{alg:ps:help:c:treenode-start}
+        \State TreeNode *$\mathit{p} \gets T$
+        \State int $\mathit{nds} \gets 0$
+    
+        \While{$\mathit{p \neq NULL\ \And\ nds \neq i}$}
+            \If{$\mathit{nds + p \rightarrow cnt + 1 < i}$}
+                \State $\mathit{nds} \gets \mathit{nds + p \rightarrow cnt + 1}$
+                \State $\mathit{p} \gets p \rightarrow rc$
+            \Else
+                \State $\mathit{p} \gets p \rightarrow lc$
+            \EndIf
+        \EndWhile
+        \State \Return $\mathit{p}$ \label{alg:ps:help:c:treenode-end}
+    \EndProcedure
+    
+    \vspace*{1mm}
+    \Procedure{HelpTree}{Function *$f$, TreeNode *$T$}
+        \If{$T == NULL$}
+            \State \Return
+        \EndIf
+        \State \Call{HelpTree}{$f$, $T \rightarrow lc$}
+        \If{$*T$ is unprocessed}
+            \State $*f(*T)$
+        \EndIf
+        \State \Call{HelpTree}{$f$, $T \rightarrow rc$}
+    \EndProcedure
+    
+    \end{algorithmic}
+    
+    \caption{Pseudocode for \Put\ and \Traverse\ of \PS\ in \Fresh. Code for thread $t \in \{ 1, \ldots, N-1\}$.}
+    \label{alg:ps}
+    \end{algorithm}
+
+
+    \subsubsection{Insert in Leaf-Oriented Tree}
+    \label{sec:leaf-oriented}
+
+    Each node of the tree stores a key and the pointers
+    to its left and right children.  (refer to Algorithm~\ref{alg:tree}).
+    A leaf node stores additionally an array $D$, where the leaf's data are stored. 
+    We assume that each data item is a pair containing a key and the associated information.
+    A node may have its own key. For instance, in iSAX-based indexes, this key is the node's
+    iSAX summary which summarizes all data series stored in it.
+    The proposed implementation allows multiple insert operations to concurrently update array
+    $D$ of a leaf. This results in enhanced parallelism and performance. 
+    To achieve this, each leaf $\ell$ contains a counter, called $\mathit{Elements}$.
+    % 
+    Each thread $\mathit{t}$ that tries to insert data in $\ell$, uses
+    $\mathit{Elements}$ to acquire a position $\mathit{pos}$ in the array $D$ of $\ell$.
+    If $D$ is not full, (line~\ref{alg:tree:pos-in-D}) (i.e. $\mathit{pos} < M$), 
+    $\mathit{t}$ stores the new element in $D[\mathit{pos}]$ (line~\ref{alg:tree:store-in-D}).
+    Otherwise, in case the array is full, i.e. $\mathit{pos \geq M}$, then 
+    $\mathit{t}$ attempts to split the leaf (line~\ref{alg:tree:pos-not-in-D}). 
+    % 
+    During spliting, $D$ may contain empty positions, since some
+    threads may have acquired positions in $D$ but have not yet stored their
+    elements there (line~\ref{alg:tree:store-in-D}).
+    To avoid situations of missing elements, each leaf contains an $\mathit{Announce}$ array 
+    with one position for each thread. A thread announces its operation
+    in $\mathit{Announce}$ before it attempts to acquire a position in $D$.
+    During spliting, a thread distributes to the new leaves it creates not only the
+    elements found in $D$ but also those in $\mathit{Announce}$.
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%Tree Insert Code%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    \begin{algorithm}[t]
+        \footnotesize
+        \caption{TraverseTree: a lock-free leaf-oriented tree with fat leaves, implementing a traverse object.
+         Code for thread $t \in \{ 1, \ldots, N-1\}$.}
+        \label{alg:tree}
+        \begin{algorithmic}[1]
+    
+            \Statex \textbf{Shared Variables:}
+            \State $\mathit{Tree} \gets \NULL$ \Comment{Initially points to a Leaf with initialized values}
+    
+            \Procedure{TreeInsert}{$\mathit{data}, \mathit{isHelper}$}
+                \State $\mathit{leaf} \gets$ \NULL
+                \State $\mathit{parent} \gets \mathit{Tree}$
+                \State $\mathit{ptr} \gets$ \NULL
+                \State $\mathit{pos}, \mathit{val} \gets 0$
+                \State $\mathit{expeditive} \gets$ \False
+    
+                \While{\True} \label{alg:tree:while}
+                    \State $\langle \mathit{leaf, parent} \rangle \gets$ \Call{Search}{$\mathit{data, parent}$} \label{alg:tree:search}
+                    \If{$\mathit{parent} = \NULL$} \label{alg:tree:ptr-parent:null}
+                        \State $\mathit{ptr} \gets \&\mathit{Tree}$
+                    \ElsIf{$\mathit{parent} \rightarrow \mathit{left} = \mathit{leaf}$}
+                        \State $\mathit{ptr} \gets \&\mathit{parent} \rightarrow \mathit{left}$ \label{alg:tree:ptr-left}
+                    \Else
+                        \State $\mathit{ptr} \gets \&\mathit{parent} \rightarrow \mathit{right}$ \label{alg:tree:ptr-right}
+                    \EndIf
+    
+                    \If{$\mathit{isHelper} = \True$ \textbf{and} $\mathit{leaf} \rightarrow \mathit{helpersExist} = \False$}
+                        \State $\mathit{leaf} \rightarrow \mathit{helpersExist} \gets \True$ \label{alg:tree:switch-mode:}
+                    \EndIf
+    
+                    \State $\langle \mathit{pos, expeditive} \rangle \gets$ \Call{NextIndex}{$\& \mathit{leaf} \rightarrow \mathit{helpersExist}$} \label{alg:tree:get-pos}
+    
+                    \If{$\mathit{expeditive} = \False$}
+                        \State $\mathit{leaf} \rightarrow \mathit{Announce}[t] \gets \langle \mathit{data, \bot} \rangle$ \label{alg:tree:announce:op}
+                    \EndIf
+    
+                    \If{$\mathit{pos} < M$} \label{alg:tree:pos-in-D}
+                        \If{$\mathit{expeditive} = \False$}
+                            \State $\mathit{leaf} \rightarrow \mathit{Announce}[t].\mathit{position} \gets \mathit{pos}$ \label{alg:tree:announce:pos-in-D}
+                        \EndIf
+                        \State $\mathit{leaf} \rightarrow \mathit{D}[\mathit{pos}] \gets \mathit{data}$ \label{alg:tree:store-in-D}
+                    \Else \label{alg:tree:pos-not-in-D}
+                        \State \Call{SplitLeaf}{$\mathit{leaf}, \mathit{ptr}, \mathit{expeditive}$}
+                    \EndIf
+    
+                    \If{$(*\mathit{ptr}) \rightarrow \mathit{helpersExist} = \True$} \label{alg:tree:st:finish}
+                        \If{$\mathit{expeditive} = \False$ \textbf{and} $(*\mathit{ptr}) \rightarrow \mathit{Announce}[t].\mathit{position} \neq \bot$} \label{alg:tree:op-is-applied}
+                            \State $(*\mathit{ptr}) \rightarrow \mathit{Announce}[t] \gets \langle \bot, \bot \rangle$ \label{alg:tree:clean}
+                        \Else
+                            \State \textbf{continue} \label{alg:tree:re-attempt}
+                        \EndIf
+                    \EndIf
+                    \State \Return
+                \EndWhile
+            \EndProcedure
+    
+            \Procedure{SplitLeaf}{$\mathit{leaf}, \mathit{prt}, \mathit{expeditive}$}
+                \State $\mathit{newNode} \gets$ \Call{NewNode}{} \label{alg:tree:split:new-internal-node}
+                \State $\mathit{newNode} \rightarrow \mathit{left} \gets$ \Call{NewLeaf}{}
+                \State $\mathit{newNode} \rightarrow \mathit{right} \gets$ \Call{NewLeaf}{}
+                \State $\mathit{splitBuffer} \gets \emptyset$
+    
+                \If{$\mathit{expeditive} = \False$} \label{alg:tree:em:Announce-scan}
+                    \For{$i \in \{0, \dots, n-1\}$ \textbf{where} $\mathit{leaf} \rightarrow \mathit{Announce}[i].\mathit{data} \neq \bot$} \label{alg:tree:Announce-scan}
+                        \State $\mathit{ldata} \gets \mathit{leaf} \rightarrow \mathit{Announce}[i].\mathit{data}$
+                        \If{$\mathit{leaf} \rightarrow \mathit{Announce}[i].\mathit{position} \neq \bot$} \label{alg:tree:announce-scan:pos-not-bot}
+                            \State $\mathit{leaf} \rightarrow \mathit{D}[\mathit{leaf} \rightarrow \mathit{Announce}[i].\mathit{position}] \gets \mathit{ldata}$ \label{alg:tree:announce-scan:store-in-D}
+                        \Else
+                            \State \Call{AddToBuffer}{$\mathit{ldata}, \mathit{splitBuffer}$} \label{alg:tree:announce-scan:data-copy}
+                        \EndIf
+                        \State $\mathit{newNode} \rightarrow \mathit{Announce}[i] \gets \langle \mathit{ldata}, -1 \rangle$  \label{alg:tree:announce-scan:mark-op-applied}
+                    \EndFor
+                \EndIf
+    
+                \State \Call{Distribute}{$\mathit{leaf} \rightarrow \mathit{D}, \mathit{splitBuffer}, \mathit{newNode} \rightarrow \mathit{left}, \mathit{newNode} \rightarrow \mathit{right}$} \label{alg:tree:split}
+                \State \Call{CAS}{$*\mathit{prt}, \mathit{leaf}, \mathit{newNode}$} \label{alg:tree:CAS}
+            \EndProcedure
+    
+        \end{algorithmic}
+    \end{algorithm}
+    
+    More specifically, a thread $t$ executing \TreeInsert\ repeatedly executes the following actions. 
+    It first calls a standard \textit{Search} routine to traverse a path of the tree and find an appropriate
+    $\mathit{leaf}$ and its $\mathit{parent}$ (line~\ref{alg:tree:search}).
+    Pointer $\mathit{ptr}$ is a reference to the appropriate child field of $\mathit{parent}$,
+    which needs to be changed to perform \TreeInsert.  (lines~\ref{alg:tree:ptr-parent:null}-\ref{alg:tree:ptr-right}).
+    Next, $t$ accesses the counter object to acquire a position in $D$ (line~\ref{alg:tree:get-pos})
+    and proceeds to announce the data that it wants to insert in the tree (line~\ref{alg:tree:announce:op}).
+    Afterwards, it announces this position in $\mathit{Announce}$ and stores the data in $D[\mathit{pos}]$
+    (line~\ref{alg:tree:store-in-D}), if $D$ is not full (line~\ref{alg:tree:pos-in-D}). 
+    If $D$ is full, it calls \SplitLeaf\ to split $\mathit{leaf}$.
+    If this \CAS\ succeeds, then the data have been added and \TreeInsert\ completes. 
+    Otherwise, some other thread has successfully split the node.
+    
+    We finally discuss the following subtle scenario. Assume that the owner thread $t$ calls \TreeInsert,
+    reaches a leaf $\mathit{l}$, and acquires the last valid position in array $D$ of $\mathit{l}$. 
+    Thread $t$ executes in expeditive mode (so it does not announce its data),
+    and before it records its data in $D$, it becomes slow. Next, a helper thread $t'$ reaches $\mathit{l}$, switches 
+    $\mathit{l}$'s execution mode to standard, and splits $\ell$ (executing on standard mode). 
+    Unfortunately, during this split, $t'$ will not take into 
+    consideration the data of $t$, since $t$ neither has announced its operation
+    (since $t$ was executing in expeditive mode), nor has yet written its data into $D$. 
+    To disallow thread $t$ from finishing its operation without inserting its data, \TreeInsert\ provides the 
+    following mechanism (lines~\ref{alg:tree:st:finish}-\ref{alg:tree:re-attempt}). Before it terminates, 
+    thread $t$ re-reads the appropriate child field of the parent of $\ell$ (through $\mathit{ptr}$) 
+    and checks the $\mathit{helpersExist}$ flag of the node $nd$ that $\mathit{ptr}$ points to,
+    to figure out whether it can still operate on expeditive mode. In the scenario above, 
+    $nd$ will be the node that $t'$ has allocated to replace $\ell$, and thus it has its 
+    $\mathit{helpersExist}$ flag equal to \True\ (line~\ref{alg:tree:split:new-internal-node}). 
+    This way, $t$ discovers that the execution mode for $\mathit{l}$ has changed
+    (line~\ref{alg:tree:st:finish} and first condition of line~\ref{alg:tree:op-is-applied}),
+    and re-attempts its \Insert\ (line~\ref{alg:tree:re-attempt}).
+        
+    \begin{lemma}
+    \label{lem:tree}
+    Algor.~\ref{alg:tree} is a {\em linearizable, lock-free} implementation of a leaf-oriented
+    tree with fat leaves, supporting only insert operations.
+    \end{lemma}
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% Refinement %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    \subsection{Refinement}
+
+    To implement \RS, \Fresh\ uses a set of priorities queues
+    each implemented using an array ( Algorithm~\ref{alg:pq}). 
+    A thread inserts elements in all arrays in a round-robin fashion. 
+    This technique results in almost equally-sized arrays, which is crucial
+    for achieving load-balancing. 
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%% Sorted Arrays Code %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    \begin{algorithm}[t]
+        \footnotesize
+        \caption{Priority Queue of \Fresh. Code for thread $t$.}
+        \label{alg:pq}
+        \begin{algorithmic}[1]
+    
+            \State \textbf{Shared variables:}
+            \State $\mathit{\langle int, Data \rangle}$ $A[0..k-1]$, initially all $\langle \bot, \bot \rangle$
+            \State CounterObject $\mathit{Cnt}$, initially $0$
+            \State Boolean $\mathit{helpersExist}$, initially $\False$
+            \State int $\mathit{insPos}$, initially $0$
+            \State $\mathit{\langle int, Data \rangle}$ *$\mathit{SA}$, initially $\NULL$
+    
+            \vspace{2mm}
+            
+            \Procedure{Insert}{int $\mathit{priority},Data \mathit{values}$}
+                \State int $\mathit{pos} \gets \FAI(\mathit{insPos})$ \label{alg:pq:ins:FAI}
+                \State $\mathit{A[pos]} \gets \langle \mathit{priority, value} \rangle$ \label{alg:pq:ins:store}
+            \EndProcedure
+    
+            \vspace{2mm}
+    
+            \Procedure{InitDeletePhase}{}
+                \State $\mathit{\langle int, Data \rangle}$ *$\mathit{sa}$
+                \State $\mathit{sa} \gets$ allocate local array of $insPos$ elements
+                \State Copy non-$\bot$ elements of $A$ into $\mathit{sa}$ and sort them \label{alg:sa:local-copy}
+                \State $\mathit{\CAS(\&SA, \NULL, sa)}$ \label{alg:sa:CAS}
+            \EndProcedure
+    
+            \vspace{2mm}
+    
+            \Function{DeleteMin}{boolean $ \mathit{isHelper}$} \textbf{returns} $\mathit{Data}$
+                \If{$\mathit{isHelper = \True}$ \textbf{and} $\mathit{helpersExist = \False}$}
+                    \State $\mathit{helpersExist} \gets \True$
+                \EndIf
+                \State int $\mathit{pos} \gets \mathit{Cnt.\NextIndex(\&helpersExist})$ \label{alg:pq:deleteMin:next}
+                \If{$\mathit{pos} \geq insPos$}
+                    \State \Return $\bot$
+                \EndIf
+                \State \Return $\mathit{SA[pos].data}$
+            \EndFunction
+    
+        \end{algorithmic}
+    \end{algorithm}
+    
+    
+    
+    During query answering, an application may use the same index tree
+    to answer more than one query. In that case, the done flags of the nodes and other
+    variables need to be reset each time a new query starts. This may require syncrhonization. 
+    To avoid this case, \Fresh\ implements the {\em done} flag as a counter (rather than as a boolean). 
+    This counter describes the number of queries for which the node has been processed.
+    
+    To implement \RS.\Traverse, \Fresh\ first comes up with sorted versions of the arrays,
+    shared to all threads. Then, it uses \Refresh\ to assign sorted arrays to threads 
+    for processing. To process the elements of a sorted array $SA$, \Refresh\ is
+    applied recursively. 
+    %Specifically, the threads working on $SA$ 
+    %use a counter object to get assigned elements of $SA$.
+    Processing of an array element is performed by invoking the \Refinement\ function
+    (Algorithm~\ref{alg:iSAXTraverse}). Helping is done at the level of 
+    1. each individual priority queue and 
+    2. the set of priority queues, in a way similar to that in \PS.
+    \RS\ is a linearizable lock-free implementation of a traverse object. 
+    %As soon as $t$ discovers that all elements of $PQ$ have been assigned for processing, 
+    %it re-traverses the nodes of $PQ$,
+    %checking their done flags to figure out whether there are elements
+    %whose processing has not been completed yet, and helps
+    %whenever it is needed. Similarly, when $t$ figures out that all subtrees have been
+    %assigned for processing, it examines the done flags of the subtrees to figure out
+    %whether there are subtrees whose processing has not yet been completed, and it helps if needed. 
+    %Pseudocode for implementing \Put\ and \Traverse\ of \RS\ resemles that of \PS\ and 
+    %is omitted.
+    
+    To update BSF, \Fresh\ repeatedly reads the current value $y$ of BSF, and attempts to
+    atomically change it from $v$ to the new value $v'$, using \CAS, until it either succeeds or some value 
+    smaller than or equal to $v'$ is written in BSF.
+    
+    %When an invocation of \Traverse(\&$\mathit{\Prunning, *, \True}$)\ by a thread $t$ on \RS\ completes, 
+    %for every leaf $\ell$ in $\RS$, $\ell$ either has been processed or it has been pruned.
+    %By all the claims we present above:
+    
+    \begin{lemma}
+    \label{lem:rs}
+    {\bf (1)} \RS\ is a linearizable lock-free implementation of a traverse object that supports \Put\ and
+    \Traverse($\mathit{*, *, 0}$). 
+    {\bf (2)} For every thread $t$, when an invocation of \Traverse(\&$\mathit{\Prunning, *, \True}$)\ by $t$ on \RS\ completes, 
+    for every leaf $\ell$ in $\RS$, $\ell$ either has been processed or it has been pruned.
+    \end{lemma}
+    
+    \begin{theorem}
+    \label{thm:qa}
+    \Fresh\ solves the 1-NN problem and provides a lock-free implementation of \QueryAnswering\
+    (Alg.~\ref{alg:iSAXTraverse}). 
+    \end{theorem}
+    
+    
+
 
 \chapter{Evaluation}
 \label{chapter:Evaluation}
