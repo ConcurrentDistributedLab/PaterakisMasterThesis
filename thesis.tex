@@ -67,7 +67,7 @@
 \newcommand{\Put}{\mbox{\sc Put}}
 \newcommand{\Transform}{\mbox{\sc Transform}}
 \newcommand{\Delete}{\mbox{\sc Delete}}
-\newcommand{\Search}{\mbox{\sc Delete}}
+\newcommand{\Search}{\mbox{\sc Search}}
 \newcommand{\Traverse}{\mbox{\sc Traverse}}
 \newcommand{\SplitLeaf}{\mbox{\sc SplitLeaf}}
 \newcommand{\DeleteMin}{\mbox{\sc DeleteMin}}
@@ -133,6 +133,7 @@ Engineering, Computer Science Department.}}
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+\overfullrule=5pt
 
 
 
@@ -372,6 +373,37 @@ to locality-aware data structures.
 
 \begin{algorithm}[t]
     \footnotesize
+    \caption{Type Definitions for TreeInsertion with Dynamic Batches}
+    \label{alg:tree-types-dynamic}
+    \begin{algorithmic}[1]
+        \Statex \textbf{Type Definitions:}
+        \State \textbf{Type} Node:
+        \State \quad int $\mathit{key}$
+        \State \quad $\{Node,Leaf\}$ *$\mathit{left}$
+        \State \quad $\{Node,Leaf\}$ *$\mathit{right}$
+        \State \quad InsertRec $\mathit{Announce}[0..n-1]$
+        \State \quad \textbf{Int} $\mathit{helpersExist}$
+
+        \Statex
+        \State \textbf{Type} InsertRec:
+        \State \quad Data $\mathit{data}$
+        \State \quad int $\mathit{position}$
+
+        \Statex
+        \State \textbf{Type} Leaf \textbf{extends} Node:
+        \State \quad DynamicData $D[0..m-1]$
+        \State \quad CounterObject Elements
+
+        \Statex
+        \State \textbf{Type} DynamicData \textbf{extends} Data:
+        \State \quad int $\mathit{seq}$
+
+    \end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}[t]
+    \footnotesize
     \caption{DTraverseTree: a lock-free leaf-oriented tree with fat leaves, implementing a traverse object
     for dynamic batches. Code for thread $t \in \{0, \ldots, n-1\}$.}
     \label{alg:tree:dynamic}
@@ -388,7 +420,7 @@ to locality-aware data structures.
             \State Boolean $\mathit{expeditive}$ \label{alg:tree:isHelper_dynamic}
 
             \While{\True} \label{alg:tree:while_dynamic}
-                \State $\langle \mathit{leaf, parent} \rangle $ := $ \Search(\mathit{data, parent})$ \label{alg:tree:search}
+                \State $\langle \mathit{leaf, parent} \rangle $ := $ \Search(\mathit{data, parent})$ \label{alg:tree:search:dynamic}
                 \If{$\mathit{parent} = \NULL$} 
                     \State $ptr $ := $ \&Tree$ \label{alg:tree:ptr-null}
                 \ElsIf{$\mathit{parent \rightarrow left = leaf}$} 
@@ -417,14 +449,16 @@ to locality-aware data structures.
                     \If{$\mathit{expeditive = \False}$}
                         \State $\mathit{leaf \rightarrow Announce[t].position} $ := $ \mathit{pos}$ \label{alg:tree:pos-in-D:update_dynamic}
                     \EndIf
-
+                    \If{\br{ $\mathit{Elements.GetIndex} \leq M$ \textbf{and} $\mathit{mode} = \mathit{LOGICAL}$}}
+                        \State \br{$\mathit{CAS(\&leaf \rightarrow D[pos].seq, \bot, MARKED)}$} \label{alg:tree:store-marked}
+                    \EndIf
                     \State $\mathit{leaf \rightarrow D[pos]} $ := $ \mathit{data}$ \label{alg:tree:store-in-D_dynamic}
 
                     
                     \If{\br{$\mathit{mode == LOGICAL}$}} \label{alg:tree:store-timestamp-start}
-                        \If{\br{$\mathit{leaf \rightarrow D[pos].seq == \bot }$}}
+                        \If{\br{$\mathit{leaf \rightarrow D[pos].seq == \bot }$}} \label{alg:tree:store-timestamp:opt}
                             \State \br{\Int\ currSeq := GlobalSeq}
-                            \State \br{$\mathit{CAS(\&leaf \rightarrow D[pos].seq, \bot, currSeq)}$}
+                            \State \br{$\mathit{CAS(\&leaf \rightarrow D[pos].seq, \bot, currSeq)}$} \label{alg:tree:store-timestamp-CAS}
                         \EndIf
                     
                     \ElsIf{\tl{$\mathit{mode == SYSTEM}$}}
@@ -545,7 +579,7 @@ to locality-aware data structures.
         \State int $\mathit{arrayID}$, initially $p$
 
         \Procedure{Insert}{$\mathit{priority}$, $\mathit{values}$}
-            \State Append $\mathit{values}$ at $\mathit{A[arrayID][p]}$ \label{alg:pq:ins:store}
+            \State Append $\mathit{values}$ at $\mathit{A[arrayID][p]}$ \label{alg:pq:ins:store:dynamic}
             \State $\mathit{arrayID := (arrayID+1) \mod k}$
         \EndProcedure
 
@@ -573,9 +607,12 @@ to locality-aware data structures.
                 \State \Return $\bot$
             \EndIf
             \If{$\mathit{mode == LOGICAL}$}
+                \If{$\mathit{SA[pos].data.seq == MARKED}$}
+                    \State \Return $\bot$
+                \EndIf            
                 \If{$\mathit{SA[pos].data.seq == \bot}$}
                     \State int $\mathit{currSeq := GlobalSeq}$
-                    \State $\mathit{CAS(\&SA[pos].data.seq, \bot, currSeq)}$
+                    \State $\mathit{CAS(\&SA[pos].data.seq, \bot, currSeq)}$ \label{alg:pq:CAS:Dynamic}
                 \EndIf
             \EndIf
             \State \Return $\mathit{SA[pos].data}$
@@ -584,6 +621,105 @@ to locality-aware data structures.
     \caption{Priority queue of \Fresh with batches.}
     \label{alg:pq-dynamic}
 \end{algorithm}
+
+\subsection{Linearizable Dynamic Fresh}
+
+As discussed in previous chapters, we designed and implemented an extension of FreSh,
+called \textit{DFreSh}, that supports insertions of dynamic batches while ensuring that
+queries always return the best possible answer and respect linearizability.
+In the pseudocode provided, we refer to this version as \textit{LOGICAL}.
+This approach is completely lock-free, meaning that neither index workers nor query workers
+need to wait for each other as long as they have available work. For example, index workers
+can continue inserting batches while query workers process queries concurrently.  
+% 
+To ensure correctness, we need a mechanism that guarantees a query with a
+specific timestamp always returns the same result. To achieve this, we introduce 
+a sequence number mechanism. Specifically, we maintain a global shared counter,
+\textit{GlobalSeq}, which is accessible to both index and query workers.
+Query workers read the current value of \textit{GlobalSeq} and attempt to increment it
+by one before answering a query. A query must be able to see all data series inserted
+into the index with a timestamp smaller than or equal to its own before it is answered.  
+%
+The insertion process for index workers follows the same general approach as in FreSh,
+using the \texttt{TreeInsert} method (see Algorithm~\ref{alg:tree:dynamic}). However,
+the iSAX tree structure in this dynamic setting differs from that of FreSh.
+Each leaf node now contains an array \( D \), where each element consists of
+a sequence number, an iSAX summary, and a pointer to the original data series stored in
+\texttt{RawData}. Despite these differences, the core insertion procedure remains
+similar to what was described in Chapter~\ref{chapter:FreSh}.  
+An index worker first locates the appropriate leaf to insert a new element
+(line~\ref{alg:tree:search:dynamic}). It then attempts to acquire a position in the leaf
+node. If space is available (line~\ref{alg:tree:pos-in-D_dynamic}), the data series is
+stored as before. However, for an element to be considered valid, it must first be assigned
+a sequence number, which is done using a Compare-And-Swap (CAS) operation
+(line~\ref{alg:tree:store-timestamp-CAS}).  
+Since queries are processed concurrently with insertions, a query worker may
+encounter elements in a candidate leaf during the \textit{Refinement} stage. For each
+element in the leaf, the query worker first checks its sequence number. If the sequence
+number is smaller than or equal to the query's timestamp, the element must be considered
+in the query result. If it has a larger value, the query worker skips it. However, if the
+sequence number is unassigned (denoted by \( \bot \)), the query worker cannot ignore
+the element and must help assign a sequence number using a CAS operation
+(line~\ref{alg:pq:CAS:Dynamic}). Since both index and query workers can assign sequence
+numbers, the CAS operation ensures correctness while the preceding conditional
+check optimizes performance by avoiding unnecessary failed CAS attempts.
+%
+On the other hand, if the leaf is full, the index worker attempts to perform a split.  
+During the split operation, the index worker first examines the announce array
+for any operations that have been announced but not yet placed into the leaf.
+If a thread has announced both the data and its position inside the leaf,
+the thread performing the split rewrites the data into that position,
+as was done in FreSh. Additionally, if the sequence number is unassigned,
+the worker helps assign one. However, if the position has not yet been announced,
+the data is temporarily stored in a buffer called \textit{splitBuffer}.  
+%
+Next, the index worker distributes the elements stored in \textit{splitBuffer},
+along with those already in the leaf, to the new left and right child nodes
+based on their iSAX summaries. During this process, for elements originally
+from the leaf, the worker checks their sequence numbers and assigns one
+if necessary. This step is crucial because the leaf remains connected to the
+tree, making it visible to query workers, which may have included it in their
+query results.  
+%
+Once all elements are distributed, the worker attempts to finalize the split
+using a \CAS operation, following the same approach as in FreSh. However,
+to fully complete the split, a traversal of the newly created child nodes
+is required. This is because elements moved from the \textit{splitBuffer}
+may still have unassigned sequence numbers. Importantly, this traversal must
+not be performed before the split is established, as announce arrays are not
+visible to query workers. If these elements receive a sequence number smaller
+than or equal to that of an ongoing query before the split is finalized,
+it could lead to correctness violations.
+% 
+
+There is one final scenario that can occur during splitting, which we address
+using the keyword \textit{MARKED}. Consider the following case: an index worker
+announces its data and acquires a position in the leaf but becomes slow before
+announcing the position. Meanwhile, another index worker starts a split operation.
+Since the first worker has not yet announced its position, its operation is treated
+as incomplete and stored in the \textit{splitBuffer}.  
+%
+While the split is ongoing, the first worker resumes execution and inserts its element
+into the leaf. At this point, the element becomes visible to queries and may receive
+a sequence number-either from the inserting thread or from a query worker. This can
+lead to a correctness violation because the same element might be assigned different
+sequence numbers before and after the delay. If the thread performing the split has
+already processed the position where the first worker is placing the element,
+it will not include it, meaning the element will only receive a sequence number
+when the new child nodes are traversed after the split. If this element happens
+to be the best answer for an ongoing query, the query may or may not include it in
+its results, violating correctness.  
+%
+To prevent this issue, we introduce a marking technique. Before storing data into 
+the leaf, a thread first checks whether a split is in progress by reading the value
+of \textit{NextIndex}. If a split is occurring, the thread marks its position
+by setting the sequence number to \textit{MARKED} using a CAS operation before
+inserting the data. A query encountering a \textit{MARKED} position treats it as 
+invalid. During the split operation, all marked positions are reset to \( \bot \), 
+ensuring that these elements receive a sequence number either from a query worker
+or when processing the new child nodes after the split.
+
+
 
 \chapter{Evaluation}
 \label{chapter:Evaluation}
