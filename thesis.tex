@@ -30,6 +30,8 @@
 \usepackage{float}
 
 
+
+
 %%%%%%%%%%%%%
 \input{libtex/procs}
 \input{libtex/alias}
@@ -93,6 +95,20 @@
 \newcommand{\RawData}{\mbox{$\mathit{RawData}$}}
 \newcommand{\Refresh}{\mbox{$\mathit{ReFreSh}$}}
 \newcommand{\Fresh}{\mbox{$\mathit{FreSh}$}}
+\newcommand{\MESSI}{\mbox{$\mathit{MESSI}$}}
+\newcommand{\MESSIenh}{\mbox{$\mathit{MESSIenh}$}}
+%BASELINES
+\newcommand{\DoAll}{\mbox{\sf DoAll}}
+\newcommand{\FI}{\mbox{\sf FI-Based}}
+\newcommand{\FINoSum}{\mbox{\sf FI-Based-NoSum}}
+\newcommand{\DoAllSplit}{\mbox{\sf DoAll-Split}}
+\newcommand{\DoAllSplitNoSum}{\mbox{\sf DoAll-Split-NoSum}}
+\newcommand{\CASBased}{\mbox{\sf CAS-Based}}
+%Evaluation
+\newcommand{\FreshSub}{\mbox{Subtree}}
+\newcommand{\FreshSTD}{\mbox{Standard}}
+\newcommand{\FreshTreeCopy}{\mbox{TreeCopy}}
+
 
 
 % FOR WRITING GREEK %
@@ -339,13 +355,12 @@ to locality-aware data structures.
 \setcounter{page}{1}
 \setcounter{tocdepth}{3}
 
-% \tableofcontents
-%     \addtocontents{toc}{\contentsline {chapter}{Table of Contents}{i}}
+\tableofcontents
 
-% \listoftables
+%\listoftables
 %     \addtocontents{toc}{\contentsline {chapter}{List of Tables}{iii}}
 
-% \listoffigures
+\listoffigures
 %     \addtocontents{toc}{\contentsline {chapter}{List of Figures}{v}}
 
 % \cleardoublepage
@@ -720,9 +735,7 @@ ensuring that these elements receive a sequence number either from a query worke
 or when processing the new child nodes after the split.
 
 
-
-\chapter{Evaluation}
-\label{chapter:Evaluation}
+\include{src/evaluation}
 
 
 
