@@ -884,3 +884,213 @@ answering time shows only minimal variation across different batch sizes.
 
 \clearpage
 \subsection{Evaluation using Real Datatasets}
+
+This section focuses on experiments conducted using real datasets. Our
+experimental analysis of DFreSh requires executing 50 queries per inserted
+batch. However, the original dataset contained only 100 queries, which were
+insufficient for our experiments. To generate additional queries, we randomly
+selected series from the dataset, added Gaussian noise 
+($\mu = 0$, $sigma = 0.1$) to each point, and used these modified series 
+as queries. Answering queries on real datasets typically requires more time,
+as observed in the evaluation of FreSh and previous works, since real queries
+tend to be more challenging. The added noise further increases query difficulty,
+making the evaluation even more demanding.As a result, the delays used for 
+random datasets cannot be applied to real datasets. 
+Given that query answering is more computationally intensive than index
+construction in this setting, we adjusted the distribution of worker threads
+between these tasks. Instead of assigning $36$ workers to index construction
+and $12$ to query answering, as in previous experiments, we reversed the
+allocation, dedicating $36$ workers to query answering and $12$ to index
+construction. This ensures that more computational resources are available
+for the more demanding phase of the process.
+
+\noindent{\textbf{Astro Dataset}}  
+The initial index size is set to $10$GB, and we use only the first $100$GB
+of the dataset. This decision is based on two factors: (1) previous experiments
+have shown that dataset size does not affect the average performance of DFreSh,
+and (2) the experiment is computationally expensive and time-consuming.
+
+
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/ASTRO/index_construction_astro.png}
+		\caption{Astro: Real Index Construction Time }
+		\label{fig:actual-index-Construction-time-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/astro_query_answering_xaxis.png}
+		\caption{Astro: Real Query Answering Time}
+		\label{fig:actual-query-answering-time-astro}
+	\end{subfigure}
+	\caption{Astro: DFreSh Overall Performance}
+	\label{fig:dfresh-performance-astro}
+\end{figure*}
+
+Figure~\ref{fig:dfresh-performance-astro} presents the overall performance
+of DFreSh. Specifically, Figure~\ref{fig:actual-index-Construction-time-astro}
+shows the index construction time, where, as expected, versions utilizing
+summarization buffers achieve better performance. We observe that
+\textit{System Timestamps} outperform \textit{Logical Timestamps}. 
+This is expected, as system timestamps eliminate the need for CAS instructions
+during timestamp assignment and reduce concurrency in the iSAX tree between
+workers handling different phases due to the waiting protocol we described,
+which in turn leads to fewer cache misses. 
+Figure~\ref{fig:actual-query-answering-time-astro} illustrates the total query
+answering time for processing 450 queries. As expected, summarization buffers
+improve performance. Additionally, as the delay increases, different versions
+tend to perform better because more queries are processed within each batch.
+Consequently, fewer queries are carried over to subsequent batches, reducing
+the number of queries that must be answered on an increasingly larger index.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Query Breakdown %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\noindent{\textbf{Query Breakdown}}
+%
+Figure~\ref{fig:dfresh-query-breakdown-astro} illustrates the distribution of query
+answering time in DFreSh. It shows how much of the query processing occurs during the
+concurrent execution phase, including the delay times, and how much takes place after
+index construction is complete. This distinction is represented by the light and dark
+segments of the bars, respectively. Additionally, this figure provides insight into
+the difficulty of query answering. The required delay is $10$ times larger than that 
+in the Random dataset.
+
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/ASTRO/breakdown_astro_50.png}
+		\caption{Astro: Query Breakdown 50 Delay}
+		\label{fig:actual-query-breakdown-50-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/breakdown_astro_60.png}
+		\caption{Astro: Astro: Query Breakdown 60 Delay}
+		\label{fig:actual-query-breakdown-60-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/breakdown_astro_70.png}
+		\caption{Astro: Astro: Query Breakdown 70 Delay}
+		\label{fig:actual-query-breakdown-70-astro}
+	\end{subfigure}
+	\caption{Astro: Query Performance Breakdown}
+	\label{fig:dfresh-query-breakdown-astro}
+\end{figure*}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Query Progress %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\noindent{\textbf{Query Progress}}
+%
+Figures~\ref{fig:query-progress-50-astro} to~\ref{fig:query-progress-70-astro} show 
+the average query answering time as the index size increases. The details of what each
+bar represents are explained in the same experiment conducted on the random dataset.
+A few observations can be made from these graphs. As expected, as the delay increases,
+all versions of DFreSh continue to answer queries in a timely manner. However, in
+Figures~\ref{fig:logical-ts-50-astro} to~\ref{fig:system-ts-50-astro}, a different
+pattern emerges between the \textit{Logical} and \textit{System} timestamps. Although
+\textit{System} timestamps appear fast enough to answer queries promptly in the early
+stages, they end up perform worse than \textit{Logical}.
+%
+From these graphs, we observe that when the index is around half its full capacity,
+the average query answering time reaches its peak. This is likely because the queries
+being answered during this period are the most difficult or the queries cause contention
+and thus cache misses. Since \textit{Logical} timestamps support more concurrency
+between workers, they face greater contention, resulting in fewer queries being
+answered in that phase. For instance, between the $40$-$60$GB range, the
+\textit{System} version answers $89$ queries in total, while the \textit{Logical}
+version answers only $80$. However, in the next range ($70$-$80$GB), \textit{Logical}
+timestamps manage to close the $9$-query gap, answering queries in a smaller
+average time.
+
+
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/ASTRO/Batch_processing/50/average_query_time_per_batch_version_999777015_10485760_10_delay[50].png}
+		\caption{Astro: Logical TS Buffers}
+		\label{fig:logical-ts-50-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/50/average_query_time_per_batch_version_999777018_10485760_10_delay[50].png}
+		\caption{Astro: System TS Buffers}
+		\label{fig:system-ts-50-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/50/average_query_time_per_batch_version_999777016_10485760_10_delay[50].png}
+		\caption{Astro: Logical TS No Buffers}
+		\label{fig:logical-ts-no-50-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/50/average_query_time_per_batch_version_999777017_10485760_10_delay[50].png}
+		\caption{AAstro: System TS No Buffers}
+		\label{fig:system-ts-no-50-astro}
+	\end{subfigure}
+	\caption{Astro: Query Progress 50 delay}
+	\label{fig:query-progress-50-astro}
+\end{figure*}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Mesaio Delay %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/ASTRO/Batch_processing/60/average_query_time_per_batch_version_999777015_10485760_10_delay[60].png}
+		\caption{Astro: Logical TS Buffers}
+		\label{fig:logical-ts-60-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/60/average_query_time_per_batch_version_999777018_10485760_10_delay[60].png}
+		\caption{Astro: System TS Buffers}
+		\label{fig:system-ts-60-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/60/average_query_time_per_batch_version_999777016_10485760_10_delay[60].png}
+		\caption{Astro: Logical TS No Buffers}
+		\label{fig:logical-ts-no-60-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/60/average_query_time_per_batch_version_999777017_10485760_10_delay[60].png}
+		\caption{AAstro: System TS No Buffers}
+		\label{fig:system-ts-no-60-astro}
+	\end{subfigure}
+	\caption{Astro: Query Progress 60 delay}
+	\label{fig:query-progress-60-astro}
+\end{figure*}
+%%%%%%%%%%%%%%%%%%%%%%%%%% Largest%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/ASTRO/Batch_processing/70/average_query_time_per_batch_version_999777015_10485760_10_delay[70].png}
+		\caption{Astro: Logical TS Buffers}
+		\label{fig:logical-ts-70-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/70/average_query_time_per_batch_version_999777018_10485760_10_delay[70].png}
+		\caption{Astro: System TS Buffers}
+		\label{fig:system-ts-70-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/70/average_query_time_per_batch_version_999777016_10485760_10_delay[70].png}
+		\caption{Astro: Logical TS No Buffers}
+		\label{fig:logical-ts-no-70-astro}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/70/average_query_time_per_batch_version_999777017_10485760_10_delay[70].png}
+		\caption{AAstro: System TS No Buffers}
+		\label{fig:system-ts-no-70-astro}
+	\end{subfigure}
+	\caption{Astro: Query Progress 70 delay}
+	\label{fig:query-progress-70-astro}
+\end{figure*}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% Latency %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\noindent{\textbf{Latency}}
+%
+Figure~\ref{fig:query-latency} shows the average query latency for the
+Astro dataset. As expected, the latency increases as query answering
+becomes more resource-intensive. The latency is calculated as described
+in the previous sections, and the observed pattern aligns with expectations.
+
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/ASTRO/average_latency_ASTRO.png}
+	\end{subfigure}
+	\caption{Astro: Query Latency}
+	\label{fig:query-latency}
+\end{figure*}
