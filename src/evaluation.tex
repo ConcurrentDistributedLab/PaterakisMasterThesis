@@ -505,11 +505,12 @@ The minimum delay, set at 2 seconds (Figure ~\ref{fig:min-delay}), corresponds t
 time required by the fastest algorithm to answer 50 queries on the smallest index size 
 (during the insertion of the first batch). The maximum delay, set at 7 seconds
 (Figure ~\ref{fig:max-delay}), allows the slowest algorithm to complete 50 queries on the
-largest index size (last batch). The bars in the figures represent query answering times,
+largest index size (last batch). In figure~\ref{query-answering-breakdown-random} the bars represent query answering times,
 divided into two segments: the light segment indicates concurrent query answering
 during index construction, while the dark segment represents solo query answering.
-A dark segment indicates insufficient delay, causing some queries to run exclusively.
-
+A dark segment indicates insufficient delay, causing some queries to run during
+the insertion of other batches.
+%
 %Once again, the No Buffers versions perform the worst, as cache misses are more costly when not 
 %all the data in  a cache line is useful. In contrast, the buffered versions perform better because 
 %the same index worker operates on a subtree, meaning the cache lines of that worker 
@@ -612,8 +613,27 @@ increasing computational effort and response times.
 	\label{query-answering-breakdown-random}
 \end{figure*}
 
+\clearpage
 \subsubsection{Query Progress}
-
+Figures~\ref{fig:query-progress-delay-2}-\ref{fig:query-progress-delay-7} illustrate
+the progress of DFreSh while batches are being inserted. These graphs provide an overview
+of the number of queries answered as the index grows, with the x-axis representing the
+index size.
+%
+For example, in Figure~\ref{fig:progress-queries-2-logical}, the first bar shows
+that 50 queries were answered between the initial index state and the insertion of
+the first batch. This indicates that the implementation of DFreSh using logical timestamps
+processes all queries associated with that batch before the next insertion. In contrast,
+Figure~\ref{fig:progress-queries-2-system-no-buffers} shows that the implementation
+without summarization buffers and using system timestamps answers only 31 out of 50
+queries in the same timeframe.
+%
+These graphs also provide insights into the overall query answering performance, as
+summarized in Figure~\ref{fig:actual-query-answering-time}. Notably, as the delay
+increases, even the slowest implementations,those without summarization buffers, reduce
+the number of queries carried over to subsequent batches. This suggests that with
+sufficient delay, even these slower implementations can complete all queries within
+the available time.
 %%%%% SMALLEST DELAY
 \begin{figure*}
 	\centering
@@ -737,7 +757,7 @@ Query latency is defined as the time between a query's arrival and the start of 
 As mentioned earlier, queries arrive in batches along with the update batch, meaning 
 that all queries in a batch share the same arrival time. The latency of a query is 
 defined as the time required to process all pending queries that arrived before it.
-
+%
 When the delay is long enough to process all queries in a batch, the latency of the 
 $i$-th query can be calculated as the sum of the times required to answer all previous 
 queries in the same batch:
@@ -759,7 +779,7 @@ and the time for all the queries that arrived before the $i$-th query in the cur
 
 where the first sum accounts for the pending queries from previous updates
 and the second sum accounts for the queries from the current batch up to the $i$-th query.
-
+%
 For \Fresh\, calculating latency is more complicated because it is a static index, meaning 
 query answering begins only after the index construction is complete. The time available 
 for answering queries in a given update batch can be expressed as:
@@ -819,6 +839,48 @@ behave similarly to FreSh.
 	\caption{Query Latency}
 	\label{fig:latency-random}
 \end{figure*}
+
+\subsubsection{DFreSh with different batch sizes}
+
+We have also conducted experiments using different batch sizes. In our analysis,
+we focus on batch sizes of $5$GB, $10$GB, and $20$GB. Each batch corresponds to
+answering $50$ queries. Consequently, for $5$GB batches, we process a total of
+$900$ queries over a $100$GB dataset, whereas for $20$GB batches, we process
+$250$ queries over a $110$GB dataset, considering that the initial index size
+remains $10$GB throughout our experiments.
+
+Figure~\ref{fig:dfresh-fresh-random-different-batches} presents the overall
+performance of DFreSh across different batch sizes. The results indicate that the
+behavior remains consistent, as batch size does not significantly impact either the
+index construction or query answering performance. In particular, the average query
+answering time shows only minimal variation across different batch sizes.
+
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/5GB/7/indexConstruction_7_5GB.png}
+		\caption{Real Index Construction Time 5GB Batches}
+		\label{fig:actual-index-Construction-time-5GB}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/5GB/delays_xaxis_5GB.png}
+		\caption{Real Query Answering Time 5GB Batches}
+		\label{fig:actual-query-answering-time-5GB}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/20GB/7/dataset_115343360_lockfree_Messi_ResultsindexConstruction_7_20GB.png}
+		\caption{Real Index Construction Time 20GB Batches}
+		\label{fig:actual-index-Construction-time-20GB}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/20GB/dataset_115343360_lockfree_Messi_Results_query_answering_initial[10485760]_delays_20GB.png}
+		\caption{Real Query Answering Time 20GB Batches}
+		\label{fig:actual-query-answering-time-20GB}
+	\end{subfigure}
+	\caption{Dynamic FreSh Benchmarks with different batches}
+	\label{fig:dfresh-fresh-random-different-batches}
+\end{figure*}
+
 
 \clearpage
 \subsection{Evaluation using Real Datatasets}
