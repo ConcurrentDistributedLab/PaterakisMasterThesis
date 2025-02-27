@@ -1019,7 +1019,7 @@ average time.
 	\end{subfigure}
 	\begin{subfigure}[c]{0.45\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/50/average_query_time_per_batch_version_999777017_10485760_10_delay[50].png}
-		\caption{AAstro: System TS No Buffers}
+		\caption{Astro: System TS No Buffers}
 		\label{fig:system-ts-no-50-astro}
 	\end{subfigure}
 	\caption{Astro: Query Progress 50 delay}
@@ -1045,7 +1045,7 @@ average time.
 	\end{subfigure}
 	\begin{subfigure}[c]{0.45\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/60/average_query_time_per_batch_version_999777017_10485760_10_delay[60].png}
-		\caption{AAstro: System TS No Buffers}
+		\caption{Astro: System TS No Buffers}
 		\label{fig:system-ts-no-60-astro}
 	\end{subfigure}
 	\caption{Astro: Query Progress 60 delay}
@@ -1071,7 +1071,7 @@ average time.
 	\end{subfigure}
 	\begin{subfigure}[c]{0.45\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/70/average_query_time_per_batch_version_999777017_10485760_10_delay[70].png}
-		\caption{AAstro: System TS No Buffers}
+		\caption{Astro: System TS No Buffers}
 		\label{fig:system-ts-no-70-astro}
 	\end{subfigure}
 	\caption{Astro: Query Progress 70 delay}
@@ -1093,4 +1093,172 @@ in the previous sections, and the observed pattern aligns with expectations.
 	\end{subfigure}
 	\caption{Astro: Query Latency}
 	\label{fig:query-latency}
+\end{figure*}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SEISMIC DATASET %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\noindent{\textbf{Seismic Dataset}} 
+
+The initial index size is set to $10$GB, and the total size of the
+dataset is limited to  $90$GB.
+ 
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/index_construction_seismic.png}
+		\caption{Seismic: Real Index Construction Time }
+		\label{fig:actual-index-Construction-time-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/query_answering_xaxis.png}
+		\caption{Seismic: Real Query Answering Time}
+		\label{fig:actual-query-answering-time-seismic}
+	\end{subfigure}
+	\caption{Seismic: DFreSh Overall Performance}
+	\label{fig:dfresh-performance-seismic}
+\end{figure*}
+
+Figure~\ref{fig:dfresh-performance-seismic} presents the overall performance of DFreSh
+on the Seismic dataset. As with the Astro dataset, 
+Figure~\ref{fig:actual-index-Construction-time-seismic} shows that versions utilizing 
+summarization buffers achieve better index construction performance. Similarly, 
+Figure~\ref{fig:actual-query-answering-time-seismic} illustrates the total query
+answering time for processing 400 queries, where summarization buffers again lead to
+improved efficiency. Based on our analysis, the chosen delays for this dataset are set
+to 25, 35, and 50 seconds. The observations made for the \textit{Astro} dataset also 
+apply here, highlighting consistent trends across different real-world datasets.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Query Breakdown %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\noindent{\textbf{Query Breakdown}}
+%
+Figure~\ref{fig:dfresh-query-breakdown-seismic} illustrates the distribution of query 
+answering time in DFreSh for the Seismic dataset. As in the Astro dataset, it
+distinguishes between queries processed during the concurrent execution phase,
+including delay times, and those answered after index construction is complete,
+represented by the light and dark segments of the bars, respectively. Once again,
+we observe the increased difficulty of query answering in real datasets compared to
+synthetic ones, with the required delay being approximately seven times higher.
+
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/25/breakdown_seismic_25.png}
+		\caption{Seismic: Query Breakdown 25 Delay}
+		\label{fig:actual-query-breakdown-25-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/35/breakdown_seismic_35.png}
+		\caption{Seismic: Query Breakdown 35 Delay}
+		\label{fig:actual-query-breakdown-35-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/50/breakdown_seismic_50.png}
+		\caption{Seismic: Query Breakdown 50 Delay}
+		\label{fig:actual-query-breakdown-50-seismic}
+	\end{subfigure}
+	\caption{Seismic: Query Performance Breakdown}
+	\label{fig:dfresh-query-breakdown-seismic}
+\end{figure*}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Query Progress %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ \noindent{\textbf{Query Progress}}
+%
+Figures~\ref{fig:query-progress-25-seismic} to~\ref{fig:query-progress-50-seismic} 
+illustrate the average query answering time as the index size grows. The meaning of
+each bar remains the same as in the corresponding experiment on the random dataset.
+As expected, increasing the delay allows all versions of DFreSh to maintain timely
+query answering. Unlike previous cases, this dataset exhibits no unexpected behavior,
+with patterns aligning well with our observations from earlier experiments.
+
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/batch_answering/25/average_query_time_per_batch_version_999777015_10485760_10_delay[25].png}
+		\caption{Seismic: Logical TS Buffers}
+		\label{fig:logical-ts-25-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/25/average_query_time_per_batch_version_999777018_10485760_10_delay[25].png}
+		\caption{Seismic: System TS Buffers}
+		\label{fig:system-ts-25-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/25/average_query_time_per_batch_version_999777016_10485760_10_delay[25].png}
+		\caption{Seismic: Logical TS No Buffers}
+		\label{fig:logical-ts-no-25-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/25/average_query_time_per_batch_version_999777017_10485760_10_delay[25].png}
+		\caption{Seismic: System TS No Buffers}
+		\label{fig:system-ts-no-25-seismic}
+	\end{subfigure}
+	\caption{Seismic: Query Progress 25 delay}
+	\label{fig:query-progress-25-seismic}
+\end{figure*}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Mesaio Delay %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/batch_answering/35/average_query_time_per_batch_version_999777015_10485760_10_delay[35].png}
+		\caption{Seismic: Logical TS Buffers}
+		\label{fig:logical-ts-35-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/35/average_query_time_per_batch_version_999777018_10485760_10_delay[35].png}
+		\caption{Seismic: System TS Buffers}
+		\label{fig:system-ts-35-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/35/average_query_time_per_batch_version_999777016_10485760_10_delay[35].png}
+		\caption{Seismic: Logical TS No Buffers}
+		\label{fig:logical-ts-no-35-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/35/average_query_time_per_batch_version_999777017_10485760_10_delay[35].png}
+		\caption{Seismic: System TS No Buffers}
+		\label{fig:system-ts-no-35-seismic}
+	\end{subfigure}
+	\caption{Seismic: Query Progress 35 delay}
+	\label{fig:query-progress-35-seismic}
+\end{figure*}
+% %%%%%%%%%%%%%%%%%%%%%%%%%% Largest%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/batch_answering/50/average_query_time_per_batch_version_999777015_10485760_10_delay[50].png}
+		\caption{Seismic: Logical TS Buffers}
+		\label{fig:logical-ts-50-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/50/average_query_time_per_batch_version_999777018_10485760_10_delay[50].png}
+		\caption{Seismic: System TS Buffers}
+		\label{fig:system-ts-50-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/50/average_query_time_per_batch_version_999777016_10485760_10_delay[50].png}
+		\caption{Seismic: Logical TS No Buffers}
+		\label{fig:logical-ts-no-50-seismic}
+	\end{subfigure}
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/50/average_query_time_per_batch_version_999777017_10485760_10_delay[50].png}
+		\caption{Seismic: System TS No Buffers}
+		\label{fig:system-ts-no-50-seismic}
+	\end{subfigure}
+	\caption{Seismic: Query Progress 50 delay}
+	\label{fig:query-progress-50-seismic}
+\end{figure*}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% Latency %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\noindent{\textbf{Latency}}
+%
+Figure~\ref{fig:query-latency-seismic} presents the average query latency for the Seismic
+dataset. As expected, its latency follows a similar trend to that of the Astro dataset,
+given that both are real datasets. The calculation method remains the same, as described in
+previous sections, and the observed pattern is consistent with our expectations.
+
+\begin{figure*}
+	\centering
+	\begin{subfigure}[c]{0.45\textwidth}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/average_latency_SEISMIC.png}
+	\end{subfigure}
+	\caption{Seismic: Query Latency}
+	\label{fig:query-latency-seismic}
 \end{figure*}
