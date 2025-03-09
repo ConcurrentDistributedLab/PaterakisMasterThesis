@@ -217,3 +217,51 @@ systematic application of ReFreSh to transform locality-aware blocking algorithm
 lock-free versions.}
 
 \noindent{$\bullet$ TODO: ADD DFreSh contributions.}
+
+\section{Other Related Work}
+Numerous tree-based techniques for efficient and scalable data series similarity search
+have been proposed~\cite{DBLP:journals/pvldb/EchihabiZPB18, DBLP:journals/pvldb/EchihabiZPB19,
+DBLP:conf/edbt/EchihabiZP21, DBLP:journals/pvldb/EchihabiPZ21},
+including approximate~\cite{DBLP:journals/pvldb/AziziEP23, 
+DBLP:journals/kais/LevchenkoKYAMPS21} and 
+progressive~\cite{DBLP:conf/sigmod/GogolouTEBP20, DBLP:journals/tvcg/JoSF20,
+DBLP:conf/sigmod/LiZAH20, DBLP:journals/vldb/EchihabiTGBP23} solutions.
+Among these, iSAX-based indexes~\cite{isaxfamily} have proven to be particularly
+competitive in terms of both index construction and query performance~\cite{DBLP:journals/pvldb/EchihabiZPB18,
+DBLP:journals/pvldb/EchihabiZPB19, hercules, odyssey, dumpy}. These indexes also include
+parallel and distributed solutions that leverage modern hardware (e.g., SIMD, multi-core,
+multi-socket, GPU), such as ParIS+~\cite{parisplus}, MESSI~\cite{PFP21-I}, and SING~\cite{PFP21-II},
+as well as distributed approaches like DPiSAX~\cite{dpisax, dpisaxjournal} and
+Odyssey~\cite{odyssey}.
+% 
+The first lock-free concurrent search tree implementation was proposed in~\cite{EFRB10}.
+Building on the ideas from that paper, we develop a baseline algorithm, which we discuss
+and compare experimentally with \textit{FreSh} in Section~\ref{chapter:Evaluation}.
+Several other non-blocking concurrent search trees have been introduced in the 
+literature~\cite{BER14, HL16, ABF20, HJ12, NRM20, CNT14, BP12, EFHR14, FR2018, ABF+22}.
+The key novelty of our tree implementation, presented in chapter~\ref{chapter:FreSh}, is its
+ability to concurrently perform multiple insert operations in a lock-free manner to
+update the array in a (fat) leaf. Additionally, it supports the expeditive-standard mode
+of execution. These advancements result in improved parallelism and better performance.
+Our approach focuses solely on the functionality required for implementing traversal objects,
+whereas the aforementioned implementations support a variety of other features or are designed
+for different contexts.
+% 
+Concurrent priority queues have been explored in~\cite{AK15-I, RT21, WG15, SUNDELL2005609,
+tamir_et_al, LJ13}, none of which are based on sorted arrays or support different
+execution modes. In our baseline lock-free implementations, we use a skip-list-based
+priority queue~\cite{LJ13}, which has been shown to perform well. However, our experiments
+indicate that the priority queue design we implemented for \textit{FreSh} significantly
+outperforms this approach (Chapter~\ref{chapter:Evaluation}).
+% 
+Universal constructions~\cite{FK11spaa, FK12ppopp, FK14, FK17opodis, FK09, FK20,
+FKK18, EF+16, FKK22} can provide wait-free or non-blocking concurrent versions of any
+sequential data structure. However, due to their general nature, they are often less
+efficient than implementations tailored to specific data structures. The algorithms
+in~\cite{FK11spaa, FK14, FKK22} are highly efficient for small shared objects
+(e.g., stacks and queues) but are not suitable for our application.
+% 
+The concept of transforming algorithms to achieve different progress guarantees is not
+new, as seen in~\cite{SP14, ELM05, GKK06}, though these transformations address different
+problems. The technique used in \textit{FreSh}, called \textit{ReFreSh}  departs from all these
+prior approaches.

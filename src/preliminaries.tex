@@ -1,6 +1,7 @@
 \chapter{Preliminaries}
 \label{chapter:prelemenaries}
 
+\section{Data Series And Similarity Search}
 
 A \textbf{data series (DS)} of size (or dimensionality) \( n \) is a sequence 
 of \( n \) pairs, where each pair consists of a real value and its corresponding 
@@ -11,6 +12,20 @@ provides a compact representation of a data series by dividing the x-axis into
 \( w \) equal segments. Each segment is then represented by the \textbf{mean value} 
 of the corresponding points, as shown by the black horizontal lines in 
 Figure~\ref{fig:PAA}. 
+% 
+\bl{
+The PAA representation of a data series \( T = (t_1, t_2, \dots, t_n) \) is computed by 
+dividing it into \( w \) segments, each containing \( \frac{n}{w} \) data points. The 
+\( i \)-th PAA coefficient \( \overline{t}_i \) is given by:  
+
+\begin{equation}
+\overline{t}_i = \frac{w}{n} \sum_{j=\frac{n}{w} (i-1) + 1}^{\frac{n}{w} i} t_j
+\label{eq:paa-transformation}
+\end{equation}
+% 
+where the summation aggregates all values in the segment, and the factor \( \frac{w}{n} \) 
+ensures proper scaling.  
+}
 % 
 To compute the \textbf{iSAX summary}~\cite{shieh2008sax}, the y-axis is partitioned 
 into \( c \) discrete regions, where \( c \) represents the \textbf{cardinality} 
@@ -37,28 +52,28 @@ For further details on iSAX-based indexes, refer to~\cite{isaxfamily}.
 
 \begin{figure}[htbp]
     \centering
-    \begin{subfigure}[b]{0.22\textwidth}
+    \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/prelem/timeseries.png}
         \caption{Data Series}
         \label{fig:dataseries}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.22\textwidth}
+    \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/prelem/PAA.png}
         \caption{PAA Summary}
         \label{fig:PAA}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.30\textwidth}
+    \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/prelem/isax.png}
         \caption{iSAX Summary}
         \label{fig:iSAXSummary}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.48\textwidth}
+    \begin{subfigure}[b]{0.8\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/prelem/isaxTreeCustom.png}
         \caption{iSAX Tree}
@@ -84,7 +99,16 @@ ED(T, T') = \sqrt{\sum_{i=1}^{n} (t_i - t'_i)^2}
 \]  
 % 
 We refer to the distance between the \textit{iSAX summaries} of two data series  
-as the \textbf{lower-bound distance}.  
+as the \textbf{lower-bound distance}. \bl{If we transform the original subsequences into PAA
+representations, $\overline{T}$ and $\overline{T'}$, using Eq.~\ref{eq:paa-transformation},
+we can then obtain a lower bounding approximation of the Euclidean distance
+between the original subsequences by:
+
+\[
+DR(\overline{T}, \overline{T'}) \equiv \sqrt{\frac{n}{w}} \sqrt{\sum_{i=1}^{w} (\overline{t}_{i} - \overline{t'}_{i})^2}
+\]
+}
+% 
 The calculation of this distance guarantees the \textbf{pruning property}:  
 the lower-bound distance between two data series is always less than or equal to  
 their Euclidean distance, which we refer to as the \textbf{real distance}.  
@@ -109,12 +133,14 @@ their values.
 If one of the newly created leaves remains empty after redistribution,  
 the splitting process is repeated until both leaves contain keys.  
 
-\noindent\textbf{iSAX-Based Indexing.}
+\section{iSAX-Based Indexing}
+
 Concurrent iSAX-based indexes~\cite{peng2018paris,parisplus,peng2020messi,  
 PFP21-I,PFP21-II} operate in two main phases:  
 the \textit{tree index construction phase} and the \textit{query answering phase},  
 each utilizing distinct data structures. 
-During the \textbf{tree index construction phase}, a set of \textit{worker threads}  
+
+\noindent\textbf{Tree Index Construction.} During this phase a set of \textit{worker threads}  
 processes a collection of input data series (i.e., \textit{raw data}).  
 Each series is summarized using an iSAX representation and inserted into a 
 \textit{tree index} as a pair of an iSAX summary and a pointer to the corresponding 
@@ -132,32 +158,32 @@ within the same subtree of the index tree.
 This approach ensures \textbf{high parallelism}, \textbf{good locality}, and  
 \textbf{low synchronization overhead} during index construction.
 
-\bigskip  
 \noindent\textbf{Query Answering.}  
-Given a query data series \( Q \), the system follows these steps:  
-\begin{enumerate}
+Given a query data series \( Q \), the system follows these steps
+to find the data series with the smallest distance to \( Q \) :  
+\vspace{-10pt} % Reduce space before the enumerate list
+\begin{enumerate}[noitemsep, topsep=3pt, partopsep=0pt, parsep=0pt]
     \item The iSAX summary of \( Q \) is computed and used to traverse the index tree,  
     leading to a leaf \( \ell \).  
     \item The \textit{real distance} between \( Q \) and each data series in \( \ell \) is computed.  
     \item The smallest distance found so far is stored in the \textbf{Best-So-Far (BSF)} variable,  
     serving as an initial approximate answer.  
 \end{enumerate}  
-Query answering proceeds in two stages:  
-\begin{itemize}
-    \item \textbf{Pruning Stage:}  
-    \begin{itemize}
-        \item A set of \textit{query answering threads} traverse the tree.  
-        \item If the \textit{lower bound distance} from a node to \( Q \) exceeds BSF,  
-        the node is \textit{pruned} and ignored in further processing.  
-        \item This guarantees that no pruned data series can be the final answer.  
-    \end{itemize}
-    \item \textbf{Refinement Stage:}  
-    \begin{itemize}
-        \item Candidate series are stored in one or more \textit{priority queues}~\cite{parisplus,PFP21-I,PFP21-II}.  
-        \item Multiple threads process these candidates, calculating their exact distances to \( Q \).  
-        \item BSF is updated whenever a smaller distance is found.  
-    \end{itemize}
-\end{itemize}   
+% 
+Then query answering proceeds by exexuting the following two stages
+namely the \textit{Prunning Stage} and the \textit{Refinement Stage}:
+
+\noindent\textbf{Pruning Stage:} In this stage, a set of \textit{query answering threads}
+traverse the tree. If the \textit{lower bound distance} from a node to $Q$
+exceeds the Best So Far (BSF) value, the node is \textit{pruned} and excluded from
+further processing. This pruning ensures that no pruned data series can contribute
+to the final answer.
+
+\noindent\textbf{Refinement Stage:} During refinement, the non pruned data series 
+are the candidate series and are stored in one or more \textit{priority queues}~\cite{parisplus,PFP21-I,PFP21-II}.
+Multiple threads process these candidate data series, calculating their exact
+distances to Q. The BSF is updated whenever a smaller distance is encountered.
+
 At the end of this phase, the final answer is contained in BSF.  
 \textit{Barriers} synchronize threads at the end of each stage, ensuring correctness,  
 while \textit{locks} handle concurrent access to shared data structures.  
@@ -165,7 +191,7 @@ Figures~\ref{fig:example} and~\ref{fig:example2} summarize the indexing process.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.5\textwidth]{figures/prelem/iSAX-index.pdf}
+    \includegraphics[width=0.8\textwidth]{figures/prelem/iSAX-index.pdf}
     \caption{Similarity search with the use of a data series index.}
     \label{fig:example}
     \vspace{-0.5cm} % Reduces space after the figure
@@ -173,7 +199,7 @@ Figures~\ref{fig:example} and~\ref{fig:example2} summarize the indexing process.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.5\textwidth]{figures/prelem/flowchart2.pdf}
+    \includegraphics[width=0.8\textwidth]{figures/prelem/flowchart2.pdf}
     \caption{Index building and query answering flowchart for the MESSI data series index.}
     \label{fig:example2}
     \vspace{-0.5cm} % Reduces space after the figure
@@ -184,8 +210,8 @@ Figures~\ref{fig:example} and~\ref{fig:example2} summarize the indexing process.
 MESSI~\cite{peng2020messi} is a state-of-the-art, in-memory iSAX-based index.
 It uses an array, referred to as \textit{RawData}, to store the raw data. During the 
 {\em buffers creation stage}, this array is split into a number of fixed-size chunks 
-containing consecutive raw data series. Worker threads repeatedly {\em acquire} and
-process these chunks, storing the calculated iSAX summaries in the appropriate 
+containing consecutive raw data series. A Worker thread repeatedly {\em acquires} and
+processes a chunk, storing the calculated iSAX summaries in the appropriate 
 summarization buffers. Threads determine which chunks to work on using a \FAI\ object.
 Each thread is allocated its own space in each summary buffer to avoid collisions when
 adding elements, ensuring thread safety. This process continues until all data series in
@@ -199,10 +225,11 @@ In the {\em query answering phase}, a query answering worker repeatedly {\em acq
 a subtree (using \FAI) and {\em traverses} it by calculating the {\em lower-bound
 distance} between the query series \( Q \) and the iSAX summary of each node
 encountered. If the lower-bound distance of a leaf is smaller than the Best So Far (BSF)
-distance, the leaf is inserted into a set of {\em priority queues}, with the distance
-used as the priority. Threads insert elements into these queues in a round-robin fashion.
+distance, the leaf is inserted into a {\em priority queue}, with the distance
+used as the priority. The algorithm uses a set of {\em priority queues} and threads 
+insert elements into these queues in a round-robin fashion.
 Since a priority queue may be concurrently accessed by multiple threads, 
-MESSI employs a coarse-grain {\em lock} for synchronization.
+MESSI employs a coarse-grain {\em lock} for each queue for synchronization.
 % 
 During the {\em refinement phase}, each query answering thread \( t \) is assigned a 
 priority queue \( \mathit{PQ} \) to process. It repeatedly removes the leaf with the
@@ -217,7 +244,8 @@ manner.
 {\em Barriers} are used among threads at the end of each stage and before the start of 
 the next to ensure correct synchronization and maintain the integrity of the process.
 
-\noindent{\bf System.}  
+\section{System}
+
 We consider a shared-memory system with \( N \) threads that execute {\em concurrently
 and asynchronously} while communicating by accessing shared objects. A shared object
 \( O \) can be atomically read or written. Additionally, the operation \FAI(O, v)
@@ -230,91 +258,46 @@ Threads may experience delays (e.g., due to page faults, power consumption issue
 or overheating~\cite{inteloverheating}), or they may fail by crashing (e.g., due to
 software errors). An algorithm is said to be {\em blocking} if a thread must wait for
 actions to be performed by other threads in order to make progress. {\em Lock-freedom}
-guarantees that the system as a whole continues to make progress, independently of the
-speed of threads or their failures.
+guarantees that some thread makes progress at each point in time, thus 
+the system as a whole continues to make progress independently of the speed of threads
+or their failures. Lock-Free algorithms do not utilize locks, MESSI is not lock-free;
+it is blocking.
 
 
-\subsection{Other Related Work}
-Numerous tree-based techniques for efficient and scalable data series similarity search
-have been proposed~\cite{DBLP:journals/pvldb/EchihabiZPB18, DBLP:journals/pvldb/EchihabiZPB19,
-DBLP:conf/edbt/EchihabiZP21, DBLP:journals/pvldb/EchihabiPZ21},
-including approximate~\cite{DBLP:journals/pvldb/AziziEP23, 
-DBLP:journals/kais/LevchenkoKYAMPS21} and 
-progressive~\cite{DBLP:conf/sigmod/GogolouTEBP20, DBLP:journals/tvcg/JoSF20,
-DBLP:conf/sigmod/LiZAH20, DBLP:journals/vldb/EchihabiTGBP23} solutions.
-Among these, iSAX-based indexes~\cite{isaxfamily} have proven to be particularly
-competitive in terms of both index construction and query performance~\cite{DBLP:journals/pvldb/EchihabiZPB18,
-DBLP:journals/pvldb/EchihabiZPB19, hercules, odyssey, dumpy}. These indexes also include
-parallel and distributed solutions that leverage modern hardware (e.g., SIMD, multi-core,
-multi-socket, GPU), such as ParIS+~\cite{parisplus}, MESSI~\cite{PFP21-I}, and SING~\cite{PFP21-II},
-as well as distributed approaches like DPiSAX~\cite{dpisax, dpisaxjournal} and
-Odyssey~\cite{odyssey}.
-% 
-The first lock-free concurrent search tree implementation was proposed in~\cite{EFRB10}.
-Building on the ideas from that paper, we develop a baseline algorithm, which we discuss
-and compare experimentally with \textit{FreSh} in Section~\ref{chapter:Evaluation}.
-Several other non-blocking concurrent search trees have been introduced in the 
-literature~\cite{BER14, HL16, ABF20, HJ12, NRM20, CNT14, BP12, EFHR14, FR2018, ABF+22}.
-The key novelty of our tree implementation, presented in chapter~\ref{chapter:FreSh}, is its
-ability to concurrently perform multiple insert operations in a lock-free manner to
-update the array in a (fat) leaf. Additionally, it supports the expeditive-standard mode
-of execution. These advancements result in improved parallelism and better performance.
-Our approach focuses solely on the functionality required for implementing traversal objects,
-whereas the aforementioned implementations support a variety of other features or are designed
-for different contexts.
-% 
-Concurrent priority queues have been explored in~\cite{AK15-I, RT21, WG15, SUNDELL2005609,
-tamir_et_al, LJ13}, none of which are based on sorted arrays or support different
-execution modes. In our baseline lock-free implementations, we use a skip-list-based
-priority queue~\cite{LJ13}, which has been shown to perform well. However, our experiments
-indicate that the priority queue design we implemented for \textit{FreSh} significantly
-outperforms this approach (Chapter~\ref{chapter:Evaluation}).
-% 
-Universal constructions~\cite{FK11spaa, FK12ppopp, FK14, FK17opodis, FK09, FK20,
-FKK18, EF+16, FKK22} can provide wait-free or non-blocking concurrent versions of any
-sequential data structure. However, due to their general nature, they are often less
-efficient than implementations tailored to specific data structures. The algorithms
-in~\cite{FK11spaa, FK14, FKK22} are highly efficient for small shared objects
-(e.g., stacks and queues) but are not suitable for our application.
-% 
-The concept of transforming algorithms to achieve different progress guarantees is not
-new, as seen in~\cite{SP14, ELM05, GKK06}, though these transformations address different
-problems. The technique used in \textit{FreSh}, called \textit{ReFreSh}  departs from all these
-prior approaches.
-
-\subsection{Dynamic Data}  
-In this Master's thesis, we assume that all data is initially stored in memory, but
-only a small subset is used to create the initial index. After the index is built,
-new data arrives dynamically in batches, with the batch size configurable by the user.
-To simulate real-time data ingestion, we introduce a delay interval between consecutive batches.
-This delay, which is also defined by the user, begins as soon as a batch arrives.
+\section{Dynamic Data}  
+To simulate dynamicity in data we assume that all data is initially stored in memory, but
+only a small subset is used to create the initial index. The rest of the data are organized into batches.
+After the initial index is built, new data arrives dynamically in batches, with the batch size
+configurable by the user. To simulate real-time data ingestion, we introduce a delay interval
+between consecutive batches. This delay, which can be defined by the user,
+begins as soon as a batch arrives. By appropriately tuning with the delay we simulate different
+dynamicity patterns in data. 
 % 
 The behavior of the system depends on the interplay between batch size and delay interval.
-If the delay is long enough, index workers (i.e., threads responsible for building the index)
+If the delay is determined to be long enough, index workers (i.e., threads responsible for building the index)
 may fully integrate each batch into the index before the next batch arrives, remaining idle for
-the rest of the time. Conversely, if the delay is short or the batch size is large, new batches
-may arrive before previous ones have been fully processed, leading to overlapping updates and
-concurrent processing.  
+the rest of the time. Conversely, if the delay is determined to be short or the batch size is large, new batches
+may arrive before previous ones have been fully processed.
 % 
 While index workers are responsible for inserting new data, query workers (i.e., threads
-responsible for answering queries) simultaneously access the same data structures to perform
+responsible for answering queries) simultaneously access this data to perform
 exact similarity search. Ensuring correctness in such a system requires a robust mechanism to
 manage concurrent updates and queries. To achieve this, we employ two models inspired by different
 domains of computer science: a \textit{timestamp-based model} and a \textit{consistency model based
 on linearizability}.  
 
-\subsubsection{Timestamp-Based Ordering}  
+\subsection{Timestamp-Based Ordering And Linearizability}  
 
 A well-known approach for handling dynamic data is the use of timestamps to enforce ordering 
 constraints. This method is widely used in database systems to ensure that data is processed
-in a meaningful sequence~\cite{babcock2002}. Notable systems employing timestamp-based mechanisms include
-Apache Kafka, Google Spanner~\cite{kafka2021,spanner2013}.  
+in a meaningful manner~\cite{babcock2002}. Notable systems employing timestamp-based mechanisms
+include Apache Kafka and Google Spanner~\cite{kafka2021,spanner2013}.  
 % 
 In our approach, timestamps are implicitly generated using the system's clock. Specifically,
-every batch is assigned a timestamp corresponding to the time when the processing of the batch starts.
-This timestamp plays a crucial role in ensuring query consistency:  
+every batch is assigned a timestamp corresponding to the time when the processing of the batch
+starts. This timestamp plays a crucial role in  how queries behave. Specifficaly,   
 
-\begin{itemize}  
+\begin{itemize} [noitemsep, topsep=3pt, partopsep=0pt, parsep=0pt]
     \item Queries must see all data that previous queries have seen.  
     \item If a query has a later timestamp than an ongoing batch, it must wait for that batch to
      finish processing before continuing.  
@@ -324,30 +307,39 @@ By enforcing this ordering, we ensure that queries always operate on a consisten
 Our approach is inspired by the principles outlined in \textit{Models and Issues in Data Stream
 Systems}~\cite{babcock2002}, which guided the design and implementation of timestamps in our dynamic system.  
 
-\subsubsection{Ensuring Correctness Through Linearizability}  
-
-The second approach we employ is inspired by \textit{linearizability}, a key concept in concurrent
+The second approach we employ is inspired by \textit{linearizability}
+\cite{herlihyWingLinearizability}, a key concept in concurrent
 and distributed systems. Linearizability provides a strong consistency guarantee by ensuring
 that all operations appear to execute atomically in a single, consistent order.  
 
-Formally, a system is \textbf{linearizable} if:  
-\begin{itemize}  
-    \item There exists a total order of operations that respects their real-time execution order.  
-    \item Once an operation completes, all subsequent operations observe its effects immediately.  
+Formally, a system execution is \textbf{linearizable} if:  
+\begin{itemize}  [noitemsep, topsep=3pt, partopsep=0pt, parsep=0pt]
+    \item For each completed operation p, to insert a
+    linearization point *p somewhere between p's
+    invocation and response in a.
+    \item To select a subset F of the incomplete operations,
+    and for each operation r in F:
+    to select a response, and
+    to insert a linearization point *r somewhere after r's invocation in a.
+    \item These operations and responses should be selected and these 
+    linearization points should be inserted, so
+    that, in the sequential execution constructed by
+    serially executing each operation at the point that
+    its linearization point has been inserted, the
+    response of each operation is the same as that in a
 \end{itemize} 
 % 
 By leveraging the principles of linearizability, we ensure that concurrent updates and queries
 interact correctly, preserving system correctness while maintaining high concurrency. 
-
-\subsubsection{Relating Timestamp and Linearizability Models}
-
-The Timestamp and Linearizability models complement each other by addressing different aspects
-of correctness in a dynamic, concurrent system. The timestamp model ensures that data is processed
-in a meaningful order, guaranteeing that queries see all data that previous queries have seen,
-respecting the temporal sequence of batch arrivals and processing. However, it does not, by itself,
-ensure that updates and queries across different workers maintain a consistent global order.
 % 
-On the other hand, linearizability ensures that all operations, whether updates or queries, are
-executed atomically and observed in a consistent, real-time order across all threads and workers.
-It guarantees that once an operation completes, its effects are immediately visible to all subsequent
-operations, preserving consistency even in highly concurrent environments.
+The Timestamp and Linearizability models complement each other by addressing different
+aspects of correctness in a dynamic, concurrent system, reflecting the principles of two
+distinct domains: the database world and the concurrent computing world.
+The timestamp model requires queries to wait for ongoing batches to finish before starting
+their processing. This ensures that any batch arriving before or concurrently with the query
+will be considered. This approach is generally preferred in the field of databases, as it
+respects the temporal sequence of batch arrivals and processing.
+On the other hand, linearizability offers more concurrency, as there is no waiting time.
+While data arrives, the algorithm is responsible for handling it, ensuring that the execution
+remains linearizable. This allows for concurrent operation throughout the entire process of
+insertions. 
