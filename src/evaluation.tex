@@ -463,6 +463,79 @@ different settings, eg different delays between update batches, (different size 
 Experiments are repeated $5$ times and averages are reported. All the algorithms
 return exact results.
 
+\noindent{\bf Latency:}
+% 
+Query latency is defined as the time between a query's arrival and the start of 
+its processing.
+% 
+As mentioned earlier, queries arrive in batches along with the update batch, meaning 
+that all queries in a batch share the same arrival time. The latency of a query is 
+defined as the time required to process all pending queries that arrived before it.
+%
+When the delay is long enough to process all queries in a batch, the latency of the 
+$i$-th query can be calculated as the sum of the times required to answer all previous 
+queries in the same batch:
+
+\begin{equation}
+\text{Latency}(q[i]) = \sum_{j=0}^{i-1} \text{qa}[j]
+\end{equation}
+% 
+where $\text{qa}[j]$ represents the time needed to answer the $j$-th query.
+% 
+However, if the delay is not sufficient to process all queries within a batch, 
+the latency of the $i$-th query is calculated differently. It includes the time 
+required to answer the pending queries from previous updates (queries from previous batches) 
+and the time for all the queries that arrived before the $i$-th query in the current batch:
+
+\begin{equation}
+\text{Latency}(q[i]) = \sum_{j=k}^{n-1} \text{qa}[j] + \sum_{j=0}^{i-1} \text{qa}[j],
+\end{equation}
+% 
+where the first sum accounts for the pending queries from previous updates
+and the second sum accounts for the queries from the current batch up to the $i$-th query.
+%
+For \Fresh\, calculating latency is more complicated because it is a static index, meaning 
+query answering begins only after the index construction is complete. The time available 
+for answering queries in a given update batch can be expressed as:
+\begin{equation}
+\text{AvailableQA}(qa[i]) = \text{DELAY} - \text{IC}[i],
+\end{equation}
+% 
+where $\text{AvailableQA}(qa[i])$ represents the available time for answering queries 
+in the $i$-th update batch, $\text{DELAY}$ is the delay interval, and $\text{IC}[i]$ 
+is the time required to insert the $i$-th batch into the index.
+% 
+If the delay is sufficient to answer all the queries in time, the latency can be calculated as:
+
+\begin{equation}
+\text{Latency}(q[i]) = \text{IC}[i] + \sum_{j=0}^{i-1} \text{qa}[j],
+\end{equation}
+% 
+where $\text{IC}[i]$ represents the time to append the $i$-th batch to the index, and 
+$\text{qa}[j]$ is the time required to answer the $j$-th query. If the delay is insufficient, 
+unanswered queries from the current batch remain pending and carry over to the next query 
+answering period. These pending queries will be processed during the 
+$\text{AvailableQA}(qa[i+1])$ interval of the subsequent update batch. 
+Thus, the latency can be calculated as:
+
+\begin{equation}
+\text{Latency}(q[i]) = \sum_{k=n}^{m} \text{IC}[k] + \sum_{j=0}^{i-1} \text{qa}[j],
+\end{equation}
+% 
+where the $n$-th batch contains the queries in question, and the $m$-th batch represents 
+when query $i$ is being answered. If the current batch also includes pending queries from 
+previous batches, the latency must also account for the time to answer those queries. 
+Thus, the general formula for calculating latency in \Fresh\ is:
+% 
+\begin{equation}
+\text{Latency}(q[i]) = \sum_{k=n}^{m} \text{IC}[k] + \sum_{j=p}^{pq} \text{qa}[j] + \sum_{j=0}^{i-1} \text{qa}[j],
+\end{equation}
+% 
+where $n$ represents the batch that contains the query $i$,-th 
+$m$ represents the batch the the $i$-th query is being answered, 
+and queries $p$ to $pq$ represents the pending queries from previous baches.
+
+
 \noindent{\bf Dynamic FreSh vs FreSh.}
 We compare the dynamic version of \Fresh, referred to as DFreSh, with \Fresh, 
 the current state-of-the-art lock-free in-memory data series index. Our implementation 
@@ -614,7 +687,7 @@ increasing computational effort and response times.
 \end{figure*}
 
 \clearpage
-\subsubsection{Query Progress}
+\subsection{Query Progress}
 Figures~\ref{fig:query-progress-delay-2}-\ref{fig:query-progress-delay-7} illustrate
 the progress of DFreSh while batches are being inserted. These graphs provide an overview
 of the number of queries answered as the index grows, with the x-axis representing the
@@ -746,78 +819,9 @@ the available time.
 
 
 
-\subsubsection{Latency}
+\subsection{Latency}
 
 Figure \ref{fig:latency-random} presents the average latency for each query. 
-
-\begin{definition}[Query Latency]
-Query latency is defined as the time between a query's arrival and the start of its processing.
-\end{definition}
-
-As mentioned earlier, queries arrive in batches along with the update batch, meaning 
-that all queries in a batch share the same arrival time. The latency of a query is 
-defined as the time required to process all pending queries that arrived before it.
-%
-When the delay is long enough to process all queries in a batch, the latency of the 
-$i$-th query can be calculated as the sum of the times required to answer all previous 
-queries in the same batch:
-
-\[
-\text{Latency}(q[i]) = \sum_{j=0}^{i-1} \text{qa}[j],
-\]
-
-where $\text{qa}[j]$ represents the time needed to answer the $j$-th query.
-
-However, if the delay is not sufficient to process all queries within a batch, 
-the latency of the $i$-th query is calculated differently. It includes the time 
-required to answer the pending queries from previous updates (queries from previous batches) 
-and the time for all the queries that arrived before the $i$-th query in the current batch:
-
-\[
-\text{Latency}(q[i]) = \sum_{j=k}^{n-1} \text{qa}[j] + \sum_{j=0}^{i-1} \text{qa}[j],
-\]
-
-where the first sum accounts for the pending queries from previous updates
-and the second sum accounts for the queries from the current batch up to the $i$-th query.
-%
-For \Fresh\, calculating latency is more complicated because it is a static index, meaning 
-query answering begins only after the index construction is complete. The time available 
-for answering queries in a given update batch can be expressed as:
-\[
-\text{AvailableQA}(qa[i]) = \text{DELAY} - \text{IC}[i],
-\]
-where $\text{AvailableQA}(qa[i])$ represents the available time for answering queries 
-in the $i$-th update batch, $\text{DELAY}$ is the delay interval, and $\text{IC}[i]$ 
-is the time required to insert the $i$-th batch into the index.
-
-If the delay is sufficient to answer all the queries in time, the latency can be calculated as:
-
-\[
-\text{Latency}(q[i]) = \text{IC}[i] + \sum_{j=0}^{i-1} \text{qa}[j],
-\]
-
-where $\text{IC}[i]$ represents the time to append the $i$-th batch to the index, and 
-$\text{qa}[j]$ is the time required to answer the $j$-th query. If the delay is insufficient, 
-unanswered queries from the current batch remain pending and carry over to the next query 
-answering period. These pending queries will be processed during the 
-$\text{AvailableQA}(qa[i+1])$ interval of the subsequent update batch. 
-Thus, the latency can be calculated as:
-
-\[
-\text{Latency}(q[i]) = \sum_{k=n}^{m} \text{IC}[k] + \sum_{j=0}^{i-1} \text{qa}[j],
-\]
-
-where the $n$-th batch contains the queries in question, and the $m$-th batch represents 
-when query $i$ is being answered. If the current batch also includes pending queries from 
-previous batches, the latency must also account for the time to answer those queries. 
-Thus, the general formula for calculating latency in \Fresh\ is:
-
-\[
-\text{Latency}(q[i]) = \sum_{k=n}^{m} \text{IC}[k] + \sum_{j=p}^{pq} \text{qa}[j] + \sum_{j=0}^{i-1} \text{qa}[j],
-\]
-where $n$ represents the batch that contains the query $i$,-th 
-$m$ represents the batch the the $i$-th query is being answered, 
-and queries $p$ to $pq$ represents the pending queries from previous baches.
 
 In Figure \ref{fig:latency-random}, System TS Buffers and FreSh exhibit similar latency. 
 The key difference between these two implementations, aside from the fact that System TS Buffers 
@@ -836,7 +840,7 @@ behave similarly to FreSh.
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Latency/average_latency.png}
 		\label{fig:average-latency}
 	\end{subfigure}
-	\caption{Query Latency}
+	\caption{Query Latency - Random 100GB-450Q}
 	\label{fig:latency-random}
 \end{figure*}
 
