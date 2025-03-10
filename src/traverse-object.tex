@@ -53,7 +53,8 @@ in a previous invocation of \textit{Traverse}.
     \State{Code for thread $t_i$, $i \in \{0, \ldots, n-1\}$:}		
     \vspace*{1mm}
 
-    \Procedure{\QueryAnswering(QuerySeriesSet $\mathit{SQ}$) \textbf{returns} int}{}
+    \Procedure{\normalfont QueryAnswering(QuerySeriesSet $\mathit{SQ}$) \textbf{returns} int}{}
+
         \State \BC.\Traverse(\&BufferCreation(), $\mathit{BCParam}$, \False)
         \State \TP.\Traverse(\&TreePopulation(), $\mathit{TPParam}$, \False)
         \State \PS.\Traverse(\&Prunning(), $\mathit{PSParam}$, \False)
@@ -75,8 +76,8 @@ in a previous invocation of \textit{Traverse}.
     \EndProcedure
     
     \vspace*{1mm}
-    \Procedure{\Prunning(DataSeries $Q$, DataSeriesSet $\mathit{E}$, Boolean
-        $\mathit{flag}$) \textbf{returns} boolean}{}
+    \Procedure{\Prunning(DataSeries $Q$, DataSeriesSet $\mathit{E}$,  
+     \Statex \normalfont Boolean $\mathit{flag}$) \textbf{returns} boolean}{}
             \State iSAXSummary $\mathit{iSAX} \gets$ Calculate the iSAX summary for $\mathit{E}$
             \State int $\mathit{lbDist} \gets$ lower bound distance between $\mathit{iSAX}$ and $Q$
             \If{$\mathit{lbDist} < \mathit{BSF}$}
@@ -88,7 +89,7 @@ in a previous invocation of \textit{Traverse}.
     
     \vspace*{1mm}
     \Procedure{\Refinement(DataSeries $Q$, DataSeriesSet $E$, Summary $\mathit{iSAX}$,
-     Function *\UpdateBSF) \textbf{returns} Boolean}{}
+     \normalfont Function *\UpdateBSF) \textbf{returns} Boolean}{}
         \State int $\mathit{lbDist}$, $\mathit{rDist}$
         \State $\mathit{lbDist} \gets$ lower bound distance between $\mathit{iSAX}$ and $Q$
         \If{$\mathit{lbDist} < \mathit{BSF}$}
@@ -159,7 +160,7 @@ instance of \textit{Traverse} on $S$ is performed only after all \textit{Put}
 operations that add distinct elements to $S$ have completed.
 \end{definition}
 
-\subsection{Ensuring Correctness Through Traversing and Non-Overlapping Properties}
+\subsection{Ensuring Correctness Through Traversing and\\ Non-Overlapping Properties}
 
 Assuming that the \textbf{non-overlapping property} holds for $BC$, $TP$, $PS$,
 and $RS$, and that \RawData initially contains all data series in the collection,
@@ -188,7 +189,7 @@ Implementations of \textit{Put} and \textit{Traverse} for $BC$, $TP$, $PS$, and
 $RS$ in FreSh are provided in chapter~\ref{chapter:FreSh}.
 
 \bl{
-\section{Adapting the Traverse Object for Dynamic Data Processing}  
+\section{Adapting the Traverse Object for Batches}  
 
 To support dynamic data processing in an iSAX-based index, the
 \textit{traverse object} requires adaptation. In a dynamic setting,
@@ -224,7 +225,7 @@ This requires additional mechanisms to maintain correctness.
 \subsubsection{Handling Multiple Batches}  
 
 In a dynamic environment where data arrives in batches, certain data structures
-implementing traverse objects—specifically, \BC\ and \PS—must be
+implementing traverse objects, specifically, \BC\ and \PS , must be
 \textit{re-initialized} before processing a new batch. This re-initialization
 is necessary because:  
 \begin{itemize}  
@@ -278,7 +279,6 @@ This ensures that no worker mistakenly processes data from a previous batch
         \State \BC $\gets$ initially contains all raw data series
         \State \TP, \PS, \RS $\gets$ initially empty
         \State $\mathit{BSF} \gets$ some initial value
-        \State $\mathit{NextUpdateAvailable} \gets 0$
         \State $\mathit{GlobalSeq} \gets 0$
     \EndProcedure
     

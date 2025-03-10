@@ -8,15 +8,15 @@ These applications depend on efficient similarity search, which aims to retrieve
 data series to a given query $Q$.
 Specifically, a similarity search operation returns a subset of data series from the collection 
 that are closest to $Q$  based on a defined distance metric (or similarity function).
-
+% 
 Beyond its standalone utility, similarity search is also a key component in various machine 
 learning tasks, including clustering, classification, and outlier detection. However, 
-performing similarity search at scale is computationally expensive due to two main factors 
+performing similarity search at scale is computationally expensive due to two main factors: 
 \begin{itemize}
 \item The massive size of modern data series collections, which often reach terabyte or petabyte scales.
 \item The high dimensionality of data series (i.e. length) that modern applications need to analyze.
 \end{itemize}
-
+% 
 To overcome these challenges, state-of-the-art data series indexes
 ~\cite{DBLP:journals/pvldb/EchihabiZPB18,isax2plus,wang2013data,peng2018paris,parisplus,peng2020messi,PFP21-I,PFP21-II,hercules,dumpy}
 employ data series summarization. These indexes build tree-based structures where each node 
@@ -79,7 +79,7 @@ This is one of the reasons the vast majority of the software stack still relies 
 Ensuring lock-freedom while maintaining the good performance of existing data series indexes 
 remains a significant challenge.
 %
-SState-of-the-art data series indexes are designed to (a) maintain data locality
+State-of-the-art data series indexes are designed to (a) maintain data locality
 and (b) minimize synchronization, aiming for high parallelism. 
 For example, they often partition the data into disjoint sets and assign a distinct thread to 
 handle each set's data~\cite{parisplus,PFP21-I,PFP21-II}.
@@ -113,7 +113,7 @@ data seen by previous queries, including any updates made since the last query.
 {\bf Our approach.}
 We introduce FreSh, a novel static lock-free data series index, and DFreSh, 
 its dynamic counterpart that efficiently addresses all of the above challenges. 
-
+% 
 Our experimental analysis demonstrate that FreSh matches the performance of 
 MESSI~\cite{PFP21-I}, the state-of-the-art concurrent data-series index, which is lock-based. 
 This confirms the efficiency of the helping mechanism we employ in FreSh. In many cases, 
@@ -215,6 +215,9 @@ due to its ability to preserve locality-awareness.}.
 development of locality-aware data series indexes in a modular way. This framework allows for a
 systematic application of ReFreSh to transform locality-aware blocking algorithms into efficient
 lock-free versions.}
+
+
+
 
 \noindent{$\bullet$ TODO: ADD DFreSh contributions.}
 

@@ -52,14 +52,14 @@ For further details on iSAX-based indexes, refer to~\cite{isaxfamily}.
 
 \begin{figure}[htbp]
     \centering
-    \begin{subfigure}[b]{0.45\textwidth}
+    \begin{subfigure}[b]{0.35\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/prelem/timeseries.png}
         \caption{Data Series}
         \label{fig:dataseries}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.45\textwidth}
+    \begin{subfigure}[b]{0.35\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/prelem/PAA.png}
         \caption{PAA Summary}
@@ -94,19 +94,22 @@ but our techniques are general enough to support other widely used
 The \textbf{Euclidean distance} between two time series  
 \( T = \{t_1, ... , t_n\} \) and \( T' = \{t'_1, ... , t'_n\} \)  
 is defined as:  
-\[
+\begin{equation}
 ED(T, T') = \sqrt{\sum_{i=1}^{n} (t_i - t'_i)^2}
-\]  
+\label{eq:Euclidean-distance}
+\end{equation} 
 % 
 We refer to the distance between the \textit{iSAX summaries} of two data series  
 as the \textbf{lower-bound distance}. \bl{If we transform the original subsequences into PAA
-representations, $\overline{T}$ and $\overline{T'}$, using Eq.~\ref{eq:paa-transformation},
+representations, $\overline{T}$ and $\overline{T'}$, using Eq.~\ref{eq:paa-transformation}
+(according to~\cite{Lin2007SAX}),
 we can then obtain a lower bounding approximation of the Euclidean distance
 between the original subsequences by:
 
-\[
+\begin{equation}
 DR(\overline{T}, \overline{T'}) \equiv \sqrt{\frac{n}{w}} \sqrt{\sum_{i=1}^{w} (\overline{t}_{i} - \overline{t'}_{i})^2}
-\]
+\label{eq:lower-bound-distance}
+\end{equation}
 }
 % 
 The calculation of this distance guarantees the \textbf{pruning property}:  
@@ -147,7 +150,7 @@ Each series is summarized using an iSAX representation and inserted into a
 data series.  
 % 
 The process is divided into two main stages:
-\begin{itemize}
+\begin{itemize} [noitemsep, topsep=3pt, partopsep=0pt, parsep=0pt]
     \item \textbf{Buffers Creation:} iSAX summary pairs are first stored in array-based  
     \textit{summarization buffers}.  
     \item \textbf{Tree Population:} Worker threads traverse these buffers and insert 
@@ -161,8 +164,8 @@ This approach ensures \textbf{high parallelism}, \textbf{good locality}, and
 \noindent\textbf{Query Answering.}  
 Given a query data series \( Q \), the system follows these steps
 to find the data series with the smallest distance to \( Q \) :  
-\vspace{-10pt} % Reduce space before the enumerate list
-\begin{enumerate}[noitemsep, topsep=3pt, partopsep=0pt, parsep=0pt]
+\vspace{-5pt} % Reduce space before the enumerate list
+\begin{enumerate}[noitemsep, topsep=1pt, partopsep=0pt, parsep=0pt]
     \item The iSAX summary of \( Q \) is computed and used to traverse the index tree,  
     leading to a leaf \( \ell \).  
     \item The \textit{real distance} between \( Q \) and each data series in \( \ell \) is computed.  
@@ -191,7 +194,7 @@ Figures~\ref{fig:example} and~\ref{fig:example2} summarize the indexing process.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\textwidth]{figures/prelem/iSAX-index.pdf}
+    \includegraphics[width=0.85\textwidth]{figures/prelem/iSAX-index.pdf}
     \caption{Similarity search with the use of a data series index.}
     \label{fig:example}
     \vspace{-0.5cm} % Reduces space after the figure
@@ -244,8 +247,8 @@ manner.
 {\em Barriers} are used among threads at the end of each stage and before the start of 
 the next to ensure correct synchronization and maintain the integrity of the process.
 
-\section{System}
-
+\section{System And Dynamic Data}
+\noindent{\bf System:}
 We consider a shared-memory system with \( N \) threads that execute {\em concurrently
 and asynchronously} while communicating by accessing shared objects. A shared object
 \( O \) can be atomically read or written. Additionally, the operation \FAI(O, v)
@@ -264,8 +267,8 @@ or their failures. Lock-Free algorithms do not utilize locks, MESSI is not lock-
 it is blocking.
 
 
-\section{Dynamic Data}  
-To simulate dynamicity in data we assume that all data is initially stored in memory, but
+ 
+\noindent{\bf Dynamic Data:} To simulate dynamicity in data we assume that all data is initially stored in memory, but
 only a small subset is used to create the initial index. The rest of the data are organized into batches.
 After the initial index is built, new data arrives dynamically in batches, with the batch size
 configurable by the user. To simulate real-time data ingestion, we introduce a delay interval

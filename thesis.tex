@@ -198,8 +198,8 @@ Voutes University Campus, 700 13 Heraklion, Crete, Greece\\[0.5cm]
 \newcommand{\thesistitle}{DFreSh: A Lock-Free Index for Real-Time Data Series Processing}
 \newcommand{\owner}{Paterakis George}
 \newcommand{\firstprof}{Panagiota Fatourou}
-\newcommand{\secondprof}{Professor 2}
-\newcommand{\thirdprof}{Professor 3}
+\newcommand{\secondprof}{Themis Palpanas}
+\newcommand{\thirdprof}{Kostas Magoutis}
 \newcommand{\csdchair}{Antonios Argyros}
 
 \begin{titlepage}
@@ -295,47 +295,6 @@ to locality-aware data structures.
 \vfill
 \end{titlepage}
 
-\cleardoublepage
-
-
-
-
-\thispagestyle{empty}
-
-\selg
-
-\begin{titlepage}
-\begin{center}
-\bc \Large{ \textbf{������}} \ec \bc {\bf\large ��������}\\\ec
-\end{center}
-
-
-\vfill
-
-\end{titlepage}
-
-
-\cleardoublepage
-
-
-
-
-
-\bc \large{\textbf{�����������}} \ec
-
-
-
-\cleardoublepage
-
-
-\begin{flushright}
-\emph{
-\newline \newline \newline \newline \newline \newline \newline \newline
-����� ������ ���} \\
-\end{flushright}
-
-\cleardoublepage
-
 
 \selam
 
@@ -372,7 +331,7 @@ to locality-aware data structures.
 %%%%%%%%%%%%%%%%%%%%%%% FreSh %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \include{src/fresh}
     
-\subsection{FreSh with Dynamic Updates}
+\subsection{FreSh with Dynamic Batches}
 
 
 \begin{algorithm}[t]
@@ -625,8 +584,6 @@ to locality-aware data structures.
     \caption{Priority queue of \Fresh with batches.}
     \label{alg:pq-dynamic}
 \end{algorithm}
-
-\subsection{Linearizable Dynamic Fresh}
 
 As discussed in previous chapters, we designed and implemented an extension of FreSh,
 called \textit{DFreSh}, that supports insertions of dynamic batches while ensuring that

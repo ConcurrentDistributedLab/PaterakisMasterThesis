@@ -6,7 +6,7 @@ employ $\mathit{BC}$, $\mathit{TP}$, $\mathit{PS}$, and $\mathit{RS}$ (from Sect
 and repeatedly apply \textit{ReFreSh} (from Section~\ref{chapter:Locality-aware}) to come up with \textit{FreSh},
 the first lock-free locality-aware data series index.
 
-\subsection{Counter Object}
+\section{Counter Object}
 
 \rb{Not sure if we have to include this!!!! Found it on old versions}
 
@@ -111,13 +111,14 @@ use this value to initialize $\mathit{cntSM}$ (lines~\ref{alg:co:em:pos2}-~\ref{
 
 
 
-\subsection{Buffers Creation and Tree Population} 
+\section{Buffers Creation and Tree Population} 
 \label{sec:buffers_and_tree}
 
 \BC\ is implemented using a single buffer, called \RawData.
 In \BC, \Put\ is never used, as we assume that the data are initially in \RawData.
 % 
-To implement \Traverse, we employ \Refresh.  
+To implement \\
+\Traverse, we employ \Refresh.  
 We split \RawData\ into $k$ equally-sized {\em chunks} of consecutive 
 elements , $w_1, \ldots, w_k$. This way we have a number of 
 $k$ workloads. 
@@ -133,7 +134,7 @@ Each thread $t$ that acquires or helps a chunk, uses the counter object of the c
 where each workload is comprised of the processing of just a single element of a group. 
 
 Pseudocode for \BC.\Put\ and \BC.\Traverse\ is provided 
-in Algorithm~\ref{alg:bc}. \RawData\ is comprised of $k$ chunks,
+in Algorithm~\ref{alg:bc}. \\ \RawData\ is comprised of $k$ chunks,
 each containing $m$ groups. Moreover, each group contains $r$ elements (line~\ref{alg:bc:r}). 
 \Fresh\ uses three sets of done flags, $\mathit{DChunks}$, $\mathit{DGroups}$,
 and $\mathit{DElements}$ (line~\ref{alg:bc:c}), storing one done flag for each chunk,
@@ -151,7 +152,7 @@ for group $j$ of chunk $i$.
 
 % 
 In an invocation of
-\Traverse(\&\BufferCreation, \RawData, $\mathit{Dchunks}$, $\mathit{DGroups}$, $\mathit{DElements}$,
+\Traverse(\&\BufferCreation, \RawData, $\mathit{Dchunks}$, \\ $\mathit{DGroups}$, $\mathit{DElements}$,
 $\mathit{HChunks}$, $\mathit{HGroups}$, \False, $\mathit{Chunks}$, $\mathit{Groups}$, $\mathit{Elements}$, $1$),
 $h$ is equal to \False. By the way a counter object works, it follows that 
 no expeditive mode is ever executed at the first level of the recursion.
@@ -265,7 +266,7 @@ Each summarization buffer could be further split into chunks and groups, and \Re
 Pseudocode for \Traverse\ of \TP\ closely follows that for \BC.
 \BC\ and \TP\ are lock-free implementations of a traverse object. 
 
-\subsection{Prunning and Refinement}
+\section{Prunning and Refinement}
 
 In \Fresh, \PS\ is implemented as a forest of $2^w$ leaf-oriented trees,
 one for each of the summarization buffers. 
@@ -392,7 +393,7 @@ $T$ and summing up the counters stored in the traversed nodes.
     \end{algorithm}
 
 
-    \subsubsection{Insert in Leaf-Oriented Tree}
+    \subsection{Insert in Leaf-Oriented Tree}
     \label{sec:leaf-oriented}
 
     Each node of the tree stores a key and the pointers
@@ -422,6 +423,32 @@ $T$ and summing up the counters stored in the traversed nodes.
     elements found in $D$ but also those in $\mathit{Announce}$.
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%Tree Insert Code%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    \begin{algorithm}[t]
+        \footnotesize
+        \caption{Type Definitions for the Lock-Free Tree}
+        \label{alg:tree-types}
+        \begin{algorithmic}[1]
+            \Statex \textbf{Type Definitions:}
+            \State \textbf{Type} Node:
+            \State \quad int $\mathit{key}$
+            \State \quad $\{Node,Leaf\}$ *$\mathit{left}$
+            \State \quad $\{Node,Leaf\}$ *$\mathit{right}$
+            \State \quad InsertRec $\mathit{Announce}[0..n-1]$
+            \State \quad \textbf{Boolean} $\mathit{helpersExist}$
+    
+            \Statex
+            \State \textbf{Type} InsertRec:
+            \State \quad Data $\mathit{data}$
+            \State \quad int $\mathit{position}$
+    
+            \Statex
+            \State \textbf{Type} Leaf \textbf{extends} Node:
+            \State \quad Data $D[0..m-1]$
+            \State \quad CounterObject Elements
+        \end{algorithmic}
+    \end{algorithm}
+    
+
 
     \begin{algorithm}[t]
         \footnotesize
