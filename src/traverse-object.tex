@@ -10,9 +10,7 @@ produced by the previous one. The first stage handles the original dataset, whil
 subsequent stages refine and structure the data progressively. This structured
 processing inspired the definition of the \textbf{traverse object}, whose
 sequential specification is given below.
-
-\subsection{Definition of the Traverse Object}
-
+% 
 \begin{definition}
 \label{def:traverse}
 Let $U$ be a universe of elements. A \textbf{traverse object} $S$ stores elements
@@ -27,8 +25,11 @@ of $U$ (which may not be distinct) and supports the following operations:
     the function $f$ with parameters $\mathit{fparam}$ to each element. If the
     $del$ flag is set, the elements are deleted from $S$ after being processed.
     The parameter $\mathit{fparam}$ serves the same purpose as in \textit{Put}.
-\end{itemize}
 
+    \item \textit{Clean}($S,\mathit{fparam},$): Resets $S$ to be the empty traverse
+    object.
+\end{itemize}
+% 
 A traverse object $S$ satisfies the \textbf{traversing property}:  
 Each instance of \textit{Traverse} in a sequential execution applies $f$ at
 least once to all distinct elements added to $S$ that have not been deleted
@@ -116,158 +117,148 @@ in a previous invocation of \textit{Traverse}.
     
     
 
-
-To implement the different stages of an iSAX-based index, we use four instances of a traverse object 
-to store and manipulate different types of data:
-
-\begin{itemize}
-    \item \textbf{Buffer Creation ($BC$)}: Stores the raw data series.
-    \item \textbf{Tree Population ($TP$)}: Stores pairs of iSAX summaries and
-     pointers to data series.
-    \item \textbf{Pruning ($PS$)}: Organizes these pairs into sets corresponding
-     to the leaf nodes of the tree.
-    \item \textbf{Refinement ($RS$)}: Maintains priority queues of candidate
-     series for query answering.
-\end{itemize}
-
-Each of these objects plays a crucial role in the indexing and query answering
-process. The \textbf{buffer creation} phase utilizes an array, \RawData, to 
-store the raw data series. Thus, elements of $BC$ are stored in \RawData. 
-The \textbf{tree population} phase employs a set of \textbf{summarization buffers},
-where iSAX summaries and pointers are initially stored. The traverse object $TP$
-holds these pairs. The \textbf{pruning} stage organizes these pairs within a
-leaf-oriented tree, where $PS$ manages sets of pairs corresponding to each tree leaf. 
-Finally, the \textbf{refinement} phase employs priority queues to manage tree
-leaves containing candidate series for further evaluation.
-
-\subsection{Query Answering as a Sequence of Traversals}
-
-Query answering in an iSAX-based index follows a structured sequence of four
-\textit{Traverse} operations, applied in order to the different traverse objects.  
-Algorithm~\ref{alg:iSAXTraverse} presents the pseudocode for implementing an iSAX-based index
-using traverse objects.
-
-Since the four stages do not overlap, their execution is typically synchronized
-using barriers. In Algorithm~\ref{alg:iSAXTraverse}, these barriers (as well as any 
-multithreading aspects) are embedded within the implementations of \textit{Put}
-and \textit{Traverse}. This ensures that an iSAX-based index satisfies the
-following key property:
-
+We use four instances of a traverse object to implement the four stages of an iSAX-based
+index. We call BC, TP, PS, and RS, the traverse objects that implement the buffer 
+creation,tree population, prunning, and refinement stages, respectively.
+% 
+The buffers creation phase uses an array RawData to store the raw data series, thus, the
+elements of BC are stored in RawData. The tree population phase uses a set of arrays
+(summarization buffers) where the pairs of iSAX summaries and pointers to data series
+are initially stored. TP stores these pairs. The prunning stage employs a leaf-oriented
+tree to store these pairs. Thus, PS organizes the pairs into as many sets as the leaf
+nodes of the tree. Each set contains the pairs stored in each leaf. Finally, the
+refinement stage uses priority queues to store those tree leaves containing candidate
+series.
+% 
+Answering a query is now comprised of a sequence of four invocations of TRAVERSE on the
+different traverse objects. Algorithm 1 provides pseudocode for the implementation of
+an iSAX-based index using traverse objects.
+ 
+\noindent{\bf Static case:}
+A static data series index where no data arrive in the system after the creation of the
+index is comprised of four stages which do not overlap with one another. This is
+usually ensured with the use of synchronization barriers. In the scheme of Algorithm 1,
+the barriers, if needed, (as well as multithreading processing) should be incorporated
+in the implementation of PUT and TRAVERSE. Thus, a static iSAX-based
+index satisfies the following property:
+% 
 \begin{definition}[\textbf{Non-Overlapping Property}]
-\label{def:non-overlapping}
-In every concurrent execution of the index, for every traverse object $S$, an
-instance of \textit{Traverse} on $S$ is performed only after all \textit{Put}
-operations that add distinct elements to $S$ have completed.
+    \label{def:non-overlapping}
+    In every concurrent execution of the index, for every traverse object $S$, an
+    instance of \textit{Traverse} on $S$ is performed only after all \textit{Put}
+    operations that add distinct elements to $S$ have completed.
 \end{definition}
-
-\subsection{Ensuring Correctness Through Traversing and\\ Non-Overlapping Properties}
-
-Assuming that the \textbf{non-overlapping property} holds for $BC$, $TP$, $PS$,
-and $RS$, and that \RawData initially contains all data series in the collection,
-the \textbf{traversing property} guarantees that:
-
-\begin{enumerate}
-    \item The \BufferCreation function is invoked at least once for each data
-     series in \RawData.
-    \item The corresponding iSAX summary is computed, ensuring that at least one
-     appropriate pair is inserted into $TP$.
-    \item By the \textbf{non-overlapping property}, the \TreePopulation function
-     processes all these pairs, inserting them into $PS$ (the index tree).
-    \item The \Prunning function is applied to all elements in $PS$, and leaves
-     that cannot be pruned are inserted into $RS$.
-    \item The \Refinement function is applied to every traversed element of $RS$.
-     Since \textit{Traverse} on $RS$ is invoked with $del = \mathit{True}$,
-    priority queues can be used to implement $RS$, and \DeleteMin can be employed
-    to remove elements as they are processed.
-\end{enumerate}
-
-Thus, the system ensures that only relevant candidates are further processed,
-refining the query results by computing exact distances and updating the
-\textbf{best-so-far} ($BSF$) value when necessary.
-
-Implementations of \textit{Put} and \textit{Traverse} for $BC$, $TP$, $PS$, and
-$RS$ in FreSh are provided in chapter~\ref{chapter:FreSh}.
+% 
+Assume that the non-overlapping property holds for BC, TP, PS, and RS and that RawData
+initially stores all raw data series. The traversing property implies that the
+BUFFERCREATION function is invoked at least once for each data series ds in RawData, so
+at least one appropriate pair is added for it in TP, i.e., the summarization buffers
+are populated appropriately. By the non-overlapping and the traversing properties,
+TREEPOPULATION is invoked for all these pairs. Since TREEPOPULATION invokes PUT on PS,
+it follows that at least one pair for each of the data series of the collection is
+added in PS (i.e. in the tree index). By the traversing property, all elements of PS
+are traversed and PRUNNING is called on them. Thus, all tree leaves that cannot be
+pruned are added in RS. Note that TRAVERSE on RS is invoked with the del flag being True.
+This allows to use (one or more) priority queues for implementing RS, and to employ
+DELETEMIN to delete each traversed element during TRAVERSE. REFINEMENT will be applied
+on every traversed element of RS. Therefore, those leaves that cannot be pruned will be
+further processed by calculating real distances and for the data series they store,
+and by updating BSF whenever needed. Implementations for PUT and TRAVERSE for BC, TP,
+PS, and RS in FreSh are presented in chapter~\ref{chapter:FreSh}.
 
 \bl{
-\section{Adapting the Traverse Object for Batches}  
-
-To support dynamic data processing in an iSAX-based index, the
-\textit{traverse object} requires adaptation. In a dynamic setting,
-threads execute concurrently and independently across the two distinct phases
-of the index: \textit{index creation} and \textit{query answering}.
-Consequently, the \BC\ and \TP\ traverse objects are assigned to the
-\textit{index workers} (threads responsible for constructing the index), while
-the \PS\ and \RS\ traverse objects are assigned to the \textit{query workers}
-(threads responsible for answering queries).  
-
-\subsubsection{Impact of Concurrency on Traverse Objects}  
-
-The concurrent execution of these phases alters the procedure for answering
-queries using traverse objects (see Algorithm~\ref{alg:DynamiciTraverseObject}).
-Unlike the static setting, where the procedure involves four sequential
-invocations of \Traverse\ (one for each traverse object), in the dynamic
-setting, the sequence is reduced to only the last two traverse objects,
-\PS\ and \RS.  
-
-This change directly affects the \textit{non-overlapping property}
-(Definition~\ref{def:non-overlapping}), which now applies only to traverse
-objects within the same phase:  
-\begin{itemize}  
-    \item \textbf{Index workers:} \BC\ and \TP  
-    \item \textbf{Query workers:} \PS\ and \RS  
-\end{itemize}  
-
-Since \Traverse\ and \Put\ operations can occur concurrently across phases,
-situations arise where an index worker inserts new elements into the iSAX tree
-while query workers are simultaneously pruning or refining their results.
-This requires additional mechanisms to maintain correctness.  
-
-\subsubsection{Handling Multiple Batches}  
-
-In a dynamic environment where data arrives in batches, certain data structures
-implementing traverse objects, specifically, \BC\ and \PS , must be
-\textit{re-initialized} before processing a new batch. This re-initialization
-is necessary because:  
-\begin{itemize}  
-    \item Each batch reuses the same buffers, meaning helpers must distinguish
-    between \textbf{current} and \textbf{obsolete} data.  
-    \item Helpers need to \textbf{skip outdated data} that no longer belongs to
-    the active batch.  
-    \item This differentiation is particularly important during the traversal of
-    \TP\ and \PS\ objects.  
-\end{itemize}  
-
-\subsubsection{Ensuring Correctness with Sequence Numbers}  
-
-To address these challenges, our approach introduces \textit{sequence numbers}
-as a mechanism to track the state of the algorithm.  
-
-\begin{definition}  
-A \textbf{sequence number} is a monotonically increasing integer used to track  
-the order of operations and ensure consistency in multi-threaded or
-distributed environments.  
-\end{definition}  
-
-Each \textit{summarization buffer} is associated with a sequence number.
-During \textbf{re-initialization}, an index worker performs the following steps:  
-\begin{enumerate}  
-    \item Resets the buffer size to zero.  
-    \item Increments the buffer's sequence number by one.  
-\end{enumerate}  
-
-This mechanism prevents a thread from processing outdated data. If a worker reads
-a nonzero buffer size, it indicates the presence of data. However, before proceeding,
-the worker also checks the \textbf{sequence number}:  
-\begin{itemize}  
-    \item If the sequence number \textbf{matches} the current batch ID,
-     the data is valid and can be processed.  
-    \item If the sequence number is \textbf{smaller} than the current batch ID,
-     the data is obsolete and must be ignored.  
-\end{itemize}  
-
-This ensures that no worker mistakenly processes data from a previous batch
-(see Algorithm~\ref{alg:BufferReuse}).  
-
+\noindent{\bf Dynamic case:}    
+In a dynamic environment, data arrives in batches, each with a unique ID. For every
+batch, the same sequence of events in an iSAX-based index is executed.
+During the Index Construction phase, workers compute summaries for each data series and
+place them into the appropriate summarization buffer. Each summarization buffer is a 2D
+array, where the number of rows corresponds to the number of index workers, ensuring
+that each worker has its own dedicated memory.
+Once all summaries for a batch have been generated, workers begin inserting pairs of
+summaries and pointers to the positions of the corresponding data series into the iSAX
+tree.  Since this process repeats for every batch, both the iSAX tree and the
+summarization buffers must accommodate continuous growth. However, while the iSAX tree
+must retain all data, the summarization buffers only store temporary information that
+becomes irrelevant after a batch is processed. To avoid unnecessary memory growth,
+we do not expand the summarization buffers indefinitely. Instead, we clear and reuse
+them for each batch, ensuring efficient memory utilization. 
+% Since the sequence of events
+% is implemented by the traverse objects \BC\ and \TP\ they must be reinitialized
+% before processing a new batch.
+\noindent{\bf Summarization Buffers:} 
+During \TP, workers traverse the summarization buffers to build the iSAX tree.
+Specifically, each worker acquires a summarization buffer and proceeds with
+constructing a subtree of the iSAX tree. Since summarization buffers are reused
+across batches, a worker must determine whether the data stored by other workers
+is still valid or belongs to a previous batch that has not yet been cleared.
+To distinguish which batch the data in a buffer belongs to at any given time, we
+decided to associate each worker's memory within a summarization buffer with a
+sequence number, which stores the id of the batch.
+The reinitialization of summarization buffers is performed by invoking the 
+\textit{TRAVERSE} method of \TP\ with a clean function as a parameter.  
+During this process, for each summarization buffer, each worker is responsible for:
+1. Resetting the size of his part to zero and
+2. Updating the sequence number of his part to match the ID of the next batch.
+% 
+Our system is designed to be lock-free. Thus, when an index worker reaches the \TP\
+stage, it indicates that the \BC\ phase has been completed successfully and that all
+data series for the current batch have been stored in the summarization buffers, even
+if some workers are slow or have experienced failures.
+% 
+During the execution of \TP, each worker first checks the size of its part.
+If the size is zero, the worker moves on to the next part, indicating that no data
+has been inserted into this part during the current batch. If the size is non-zero,
+meaning there is data in that part, the worker proceeds by reading the sequence number.
+If the sequence number differs from the current batch ID, it indicates that the data
+is obsolete.
+% 
+Since the system operates asynchronously, there can be stalls between these two reads.
+For instance, a worker with ID 1 may read a non-zero size and then stall. Meanwhile,
+the worker responsible for that part may update the size to 0 and set the sequence
+number to the current batch ID. When worker 1 wakes up, it reads the sequence number
+as the current batch ID. Clearly, this is an incorrect situation. To handle this,
+workers must verify if the values they have read are still the same. If not, they
+must re-read them to ensure consistency.
+% 
+In a dynamic setting, threads may concurrently execute two distinct phases of the index:
+\textit{Index Creation} and \textit{Query Answering}. This overlap introduces challenges in programming
+such a system, as batch insertions occur simultaneously with query processing. Our work
+proposes two different models: the first restricts concurrency by requiring queries
+to wait for the completion of a batch before including its data in their results,
+ensuring that queries work only with data that is already indexed. The second model is
+more dynamic, allowing queries to determine on the fly whether or not to include data
+from ongoing batches in their responses. 
+Because of this concurrent execution, the Non-Overlapping
+Property~\ref{def:non-overlapping}, which holds in the static case, does not apply
+in the dynamic setting. However, this property still applies separately to the two
+major subtasks, Index Creation and Query Answering, but not to the system as a whole.
+% 
+In Algorithm~\ref{alg:DynamiciTraverseObject} we present 
+\textit{Index Creation} and \textit{Query Answering} as two separate procedures that can
+be executed concurrently by threads. In line~\ref{alg:IndexCreation} we show the
+procedure responsible for Index Construction. Each thread has a local counter called
+called $currentBatch$ which tracks the batch the worker is currently processing.
+If the Timestamp-based model (referred to as SystemTS) is used, the system assigns a
+timestamp to the entire batch. The process then proceeds by sequentially executing the
+\BC\ and \TP\ traverse objects to insert the batch into the iSAX tree.
+% 
+As mentioned earlier, before moving to the next batch, the summarization buffers must
+be cleared to ensure they are ready for reuse. This is shown in line~\ref{alg:reuse}.
+Finally, the algorithm dynamically calculates the time it took to insert the last batch
+into the index. If this time is less than the configured $DELAY$ value set by the user,
+the index workers will sleep for the remaining time before processing the next batch.
+% 
+In line~\ref{alg:QueryAnswering}, we present the Query Answering procedure. For each
+query, if the system follows the Timestamp-based model (SystemTS), it assigns a
+timestamp to the query. If this timestamp is greater than or equal to the timestamp
+of the ongoing batch, the query must wait for the batch to complete.
+In contrast, if the system uses the Linearizable model (referred to as LogicalTS),
+queries are responsible for incrementing a global counter, $GlobalSeq$, which serves
+as a shared timestamp for both Index Creation and Query Answering. This is achieved
+using a CAS (Compare-and-Swap) instruction, where query workers attempt to update
+$GlobalSeq$ using their local counter, $localSeq$. The procedure then proceeds by
+sequentially invoking the \PS\ and \RS\ traverse objects, followed by clearing the
+buffers of the \RS\ object (line~\ref{alg:reuseRS}).
 
 \begin{algorithm}[htbp]
     \footnotesize
@@ -286,7 +277,7 @@ This ensures that no worker mistakenly processes data from a previous batch
     \State{Code for thread $t_i$, $i \in \{0, \ldots, k-1\}$:}    
     \vspace*{1mm}
     
-    \Procedure{IndexCreation(int $\mathit{TotalUpdates}$) \textbf{returns} int}{}
+    \Procedure{IndexCreation(int $\mathit{TotalUpdates}$) \textbf{returns} int}{}  \label{alg:IndexCreation}
         \State int $\mathit{currentBatch} \gets 1$
         \While{$\mathit{currentBatch} < \mathit{TotalBatches}$}
             \If{$\mathit{model} == \mathit{SystemTS}$ }
@@ -294,9 +285,10 @@ This ensures that no worker mistakenly processes data from a previous batch
             \EndIf
             \State \BC.\Traverse(\&BufferCreation(), $\mathit{BCParam}$, \False)
             \State \TP.\Traverse(\&TreePopulation(), $\mathit{TPParam}$, \False)
-            \ForAll{summarization buffers that have data}
-                \State ReuseBuffers($\mathit{summBuffer}, \mathit{currentBatch}$)
-            \EndFor
+            \State \TP.\Clean($\mathit{NULL}$) \label{alg:reuse}
+            % \ForAll{summarization buffers that have data}
+            %     \State ReuseBuffers($\mathit{summBuffer}, \mathit{currentBatch}$)
+            % \EndFor
             \If{$\mathit{DELAY} >= \mathit{BatchProcessingTime}$}
                 \State sleep($\mathit{DELAY}-\mathit{BatchProcessingTime}$)
             \EndIf
@@ -305,10 +297,8 @@ This ensures that no worker mistakenly processes data from a previous batch
     \EndProcedure
     
     \vspace*{1mm}
-    \State{Code for thread $t_i$, $i \in \{k, \ldots, n-1\}$:}    
-    \vspace*{1mm}
     
-    \Procedure{QueryAnswering(QuerySeriesSet $\mathit{SQ}$) \textbf{returns} int}{}
+    \Procedure{QueryAnswering(QuerySeriesSet $\mathit{SQ}$) \textbf{returns} int}{} \label{alg:QueryAnswering}
         \State int $\mathit{localTS} \gets 0$
         \While{$\mathit{!SQ.Empty}$}
             \If{$\mathit{model} == \mathit{LogicalTS}$}
@@ -322,10 +312,11 @@ This ensures that no worker mistakenly processes data from a previous batch
                 \EndWhile
             \EndIf
             \State \PS.\Traverse(\&Pruning(), $\mathit{PSParam}$, \False)
-            \State \TP.\Traverse(\&Refinement(), $\mathit{RSParam}$, \False)
-            \ForAll{summarization buffers that have data}
-                \State ReuseBuffers($\mathit{summBuffer}, \mathit{currentBatch}$)
-            \EndFor
+            \State \RS.\Traverse(\&Refinement(), $\mathit{RSParam}$, \False)
+            \State \RS.\Clean($\mathit{NULL}$) \label{alg:reuseRS}
+            % \ForAll{summarization buffers that have data}
+            %     \State ReuseBuffers($\mathit{summBuffer}, \mathit{currentBatch}$)
+            % \EndFor
             
             \If{$\mathit{model} == \mathit{LogicalTS}$}
                 \State $\mathit{localSeq} = \mathit{localSeq} + 1$            
@@ -334,15 +325,15 @@ This ensures that no worker mistakenly processes data from a previous batch
         \State \Return $\mathit{BSF}$
     \EndProcedure
     
-    \vspace*{1mm}
-    \Procedure{ReuseSumBuffers(SumBuff * $\mathit{currBuff}$, int $\mathit{currentBatch}$)}{} \label{alg:BufferReuse}
+    % \vspace*{1mm}
+    % \Procedure{ReuseSumBuffers(SumBuff * $\mathit{currBuff}$, int $\mathit{currentBatch}$)}{} \label{alg:BufferReuse}
 
-        \State $\mathit{currBuff->size[workerID]} \gets 0$
-        \If{$\mathit{currBuff->seq[workerID]} < \mathit{currentBatch}$}
-            \State $\mathit{currBuff->seq[workerID]} \gets \mathit{currentBatch}$
-        \EndIf
-        \State $\mathit{currBuff->seq[workerID]++}$
-    \EndProcedure
+    %     \State $\mathit{currBuff->size[workerID]} \gets 0$
+    %     \If{$\mathit{currBuff->seq[workerID]} < \mathit{currentBatch}$}
+    %         \State $\mathit{currBuff->seq[workerID]} \gets \mathit{currentBatch}$
+    %     \EndIf
+    %     \State $\mathit{currBuff->seq[workerID]++}$
+    % \EndProcedure
     
     \end{algorithmic}
     

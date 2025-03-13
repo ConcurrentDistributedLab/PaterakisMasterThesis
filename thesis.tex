@@ -73,6 +73,7 @@
 \newcommand{\Delete}{\mbox{\sc Delete}}
 \newcommand{\Search}{\mbox{\sc Search}}
 \newcommand{\Traverse}{\mbox{\sc Traverse}}
+\newcommand{\Clean}{\mbox{\sc Traverse}}
 \newcommand{\SplitLeaf}{\mbox{\sc SplitLeaf}}
 \newcommand{\DeleteMin}{\mbox{\sc DeleteMin}}
 \newcommand{\GetMin}{\mbox{\sc GetMinHeap}}
@@ -200,7 +201,7 @@ Voutes University Campus, 700 13 Heraklion, Crete, Greece\\[0.5cm]
 \newcommand{\firstprof}{Panagiota Fatourou}
 \newcommand{\secondprof}{Themis Palpanas}
 \newcommand{\thirdprof}{Kostas Magoutis}
-\newcommand{\csdchair}{Antonios Argyros}
+\newcommand{\csdchair}{Kostas Magoutis}
 
 \begin{titlepage}
 
@@ -273,25 +274,39 @@ Committee approvals: & \underline{\phantom{1234567890123456789012345678901234567
 
 Abstract
 
-In this thesis, we present DFreSh, a real-time lock-free data series index that 
-achieves high performance while maintaining robustness. DFreSh builds upon FreSh,
-the current state-of-the-art in lock-free data series indexing. FreSh, in turn,
-is based on Refresh, a generic framework designed to enable efficient lock-freedom
-in locality-aware data series indexes. Refresh provides a systematic approach
-to deriving high-performing lock-free versions of other locality-aware blocking
-data structures.
-Despite its strengths, FreSh has a critical limitation: 
-it is a static index, incapable of supporting dynamic updates after construction.
-This limitation renders FreSh unsuitable for real-time environments where data
-is continuously generated and needs to be inserted-integrated into the index
-without the need for complete rebuilding. Addressing this shortcoming,
-DFreSh introduces dynamic update capabilities, making it a robust solution
-for real-time applications while retaining the performance benefits of its predecessor.
-We evaluated DFreSh through extensive experiments using both synthetic
-and real-world datasets. The results demonstrate that DFreSh achieves
-performance comparable to FreSh, with its lightweight mechanisms for
-real-time data handling upholding the key principles of performance critical
-to locality-aware data structures. 
+In this thesis, we study lock-free data series indexes that achieve high performance
+while maintaining robustness. First, we present FreSh, a lock-free data series index
+based on Refresh, a generic approach we developed for efficiently supporting
+lock-freedom on top of any locality-aware data series index.
+We believe Refresh is of independent interest and can be used to derive 
+high-performance lock-free versions of other locality-aware blocking data structures.
+% 
+To develop FreSh, we first conducted an in-depth study of the design decisions 
+behind state-of-the-art data series indexes and the principles governing their 
+performance. This led to a theoretical framework that enables the modular development 
+and analysis of data series indexes. FreSh is designed for static data.
+Experiments with several synthetic and real datasets illustrate that FreSh 
+achieves performance comparable to that of the state-of-the-art blocking 
+in-memory data series indexes. This demonstrates that the helping mechanisms of FreSh 
+are lightweight and respect key principles that are crucial for performance 
+in locality-aware data structures.\textsuperscript{*}
+
+A second contribution of this thesis is an extension of FreSh that works
+in dynamic settings, which we call DFreSh. DFreSh handles batches of data that arrive
+in the system dynamically, making it a robust solution for real-time applications while
+retaining the performance benefits of FreSh. We follow two models of dynamicity coming
+from two research fields and study the performance properties of each of these settings
+using several synthetic and real datasets.
+
+
+
+
+\vspace{1em}
+\begin{center}
+    \textsuperscript{*}\textit{FreSh has been published in the 42nd International \textbf{Symposium on Reliable Distributed Systems}, 2023.}
+\end{center}
+\vspace{1em}
+
 \vfill
 \end{titlepage}
 
