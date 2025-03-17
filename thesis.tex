@@ -73,7 +73,7 @@
 \newcommand{\Delete}{\mbox{\sc Delete}}
 \newcommand{\Search}{\mbox{\sc Search}}
 \newcommand{\Traverse}{\mbox{\sc Traverse}}
-\newcommand{\Clean}{\mbox{\sc Traverse}}
+\newcommand{\Clean}{\mbox{\sc Clean}}
 \newcommand{\SplitLeaf}{\mbox{\sc SplitLeaf}}
 \newcommand{\DeleteMin}{\mbox{\sc DeleteMin}}
 \newcommand{\GetMin}{\mbox{\sc GetMinHeap}}
@@ -111,6 +111,8 @@
 \newcommand{\FreshSub}{\mbox{Subtree}}
 \newcommand{\FreshSTD}{\mbox{Standard}}
 \newcommand{\FreshTreeCopy}{\mbox{TreeCopy}}
+%CLEAN
+\newcommand{\TPCLEAN}{\mbox{$\mathit{TP.CLEAN}$}}
 
 
 
@@ -196,7 +198,7 @@ Voutes University Campus, 700 13 Heraklion, Crete, Greece\\[0.5cm]
 
 \thispagestyle{empty}
 
-\newcommand{\thesistitle}{DFreSh: A Lock-Free Index for Real-Time Data Series Processing}
+\newcommand{\thesistitle}{Lock-Free Indexes For Data Series Processing}
 \newcommand{\owner}{Paterakis George}
 \newcommand{\firstprof}{Panagiota Fatourou}
 \newcommand{\secondprof}{Themis Palpanas}
@@ -269,10 +271,8 @@ Committee approvals: & \underline{\phantom{1234567890123456789012345678901234567
 \thispagestyle{empty}
 \begin{titlepage}
 \begin{center}
-\bc \Large{ \textbf{TITLE}} \ec \bc {\bf\large Abstract}\\\ec
+\bc \Large{ \textbf{Lock-Free Indexes For Data Series Processing}} \ec \bc {\bf\large Abstract}\\\ec
 \end{center}
-
-Abstract
 
 In this thesis, we study lock-free data series indexes that achieve high performance
 while maintaining robustness. First, we present FreSh, a lock-free data series index
@@ -289,8 +289,9 @@ Experiments with several synthetic and real datasets illustrate that FreSh
 achieves performance comparable to that of the state-of-the-art blocking 
 in-memory data series indexes. This demonstrates that the helping mechanisms of FreSh 
 are lightweight and respect key principles that are crucial for performance 
-in locality-aware data structures.\textsuperscript{*}
-
+in locality-aware data structures.
+% \textsuperscript{*}
+% 
 A second contribution of this thesis is an extension of FreSh that works
 in dynamic settings, which we call DFreSh. DFreSh handles batches of data that arrive
 in the system dynamically, making it a robust solution for real-time applications while
@@ -323,7 +324,7 @@ using several synthetic and real datasets.
 %\listoftables
 %     \addtocontents{toc}{\contentsline {chapter}{List of Tables}{iii}}
 
-\listoffigures
+% \listoffigures
 %     \addtocontents{toc}{\contentsline {chapter}{List of Figures}{v}}
 
 % \cleardoublepage

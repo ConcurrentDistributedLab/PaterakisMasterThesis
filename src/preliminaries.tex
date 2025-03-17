@@ -51,6 +51,7 @@ For further details on iSAX-based indexes, refer to~\cite{isaxfamily}.
 
 
 \begin{figure}[htbp]
+    \vspace{-1.5cm} 
     \centering
     \begin{subfigure}[b]{0.35\textwidth}
         \centering
@@ -59,27 +60,28 @@ For further details on iSAX-based indexes, refer to~\cite{isaxfamily}.
         \label{fig:dataseries}
     \end{subfigure}
     \hfill
+    \vspace{1.0cm} 
     \begin{subfigure}[b]{0.35\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/prelem/PAA.png}
         \caption{PAA Summary}
         \label{fig:PAA}
     \end{subfigure}
-    \hfill
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/prelem/isax.png}
         \caption{iSAX Summary}
         \label{fig:iSAXSummary}
     \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.8\textwidth}
+    \vspace{1.0cm} 
+
+    \begin{subfigure}[b]{0.9\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/prelem/isaxTreeCustom.png}
         \caption{iSAX Tree}
         \label{fig:iSAXTree}
     \end{subfigure}
-    
+
     \caption{From data series to iSAX index}
     \label{fig:from_ds_to_iSAX}
 \end{figure}
@@ -160,11 +162,9 @@ Data series with similar iSAX representations are placed in the same buffer and 
 within the same subtree of the index tree.  
 This approach ensures \textbf{high parallelism}, \textbf{good locality}, and  
 \textbf{low synchronization overhead} during index construction.
-
-\noindent\textbf{Query Answering.}  
+\newline\noindent\textbf{Query Answering.}  
 Given a query data series \( Q \), the system follows these steps
 to find the data series with the smallest distance to \( Q \) :  
-\vspace{-5pt} % Reduce space before the enumerate list
 \begin{enumerate}[noitemsep, topsep=1pt, partopsep=0pt, parsep=0pt]
     \item The iSAX summary of \( Q \) is computed and used to traverse the index tree,  
     leading to a leaf \( \ell \).  
@@ -175,24 +175,21 @@ to find the data series with the smallest distance to \( Q \) :
 % 
 Then query answering proceeds by exexuting the following two stages
 namely the \textit{Prunning Stage} and the \textit{Refinement Stage}:
-
-\noindent\textbf{Pruning Stage:} In this stage, a set of \textit{query answering threads}
+\newline\noindent\textbf{Pruning Stage.} In this stage, a set of \textit{query answering threads}
 traverse the tree. If the \textit{lower bound distance} from a node to $Q$
 exceeds the Best So Far (BSF) value, the node is \textit{pruned} and excluded from
 further processing. This pruning ensures that no pruned data series can contribute
 to the final answer.
-
-\noindent\textbf{Refinement Stage:} During refinement, the non pruned data series 
+\newline\noindent\textbf{Refinement Stage.} During refinement, the non pruned data series 
 are the candidate series and are stored in one or more \textit{priority queues}~\cite{parisplus,PFP21-I,PFP21-II}.
 Multiple threads process these candidate data series, calculating their exact
 distances to Q. The BSF is updated whenever a smaller distance is encountered.
-
-At the end of this phase, the final answer is contained in BSF.  
+\newline At the end of this phase, the final answer is contained in BSF.  
 \textit{Barriers} synchronize threads at the end of each stage, ensuring correctness,  
 while \textit{locks} handle concurrent access to shared data structures.  
 Figures~\ref{fig:example} and~\ref{fig:example2} summarize the indexing process.  
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{figures/prelem/iSAX-index.pdf}
     \caption{Similarity search with the use of a data series index.}
@@ -200,7 +197,7 @@ Figures~\ref{fig:example} and~\ref{fig:example2} summarize the indexing process.
     \vspace{-0.5cm} % Reduces space after the figure
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
     \includegraphics[width=0.8\textwidth]{figures/prelem/flowchart2.pdf}
     \caption{Index building and query answering flowchart for the MESSI data series index.}
@@ -292,9 +289,9 @@ on linearizability}.
 \subsection{Timestamp-Based Ordering And Linearizability}  
 
 A well-known approach for handling dynamic data is the use of timestamps to enforce ordering 
-constraints. This method is widely used in database systems to ensure that data is processed
-in a meaningful manner~\cite{babcock2002}. Notable systems employing timestamp-based mechanisms
-include Apache Kafka and Google Spanner~\cite{kafka2021,spanner2013}.  
+constraints. This method is widely used in database systems ~\cite{babcock2002} with 
+Apache Kafka and Google Spanner~\cite{kafka2021,spanner2013} being example of systems
+that employ such mechanisms.  
 % 
 In our approach, timestamps are implicitly generated using the system's clock. Specifically,
 every batch is assigned a timestamp corresponding to the time when the processing of the batch
@@ -302,8 +299,8 @@ starts. This timestamp plays a crucial role in  how queries behave. Specifficaly
 
 \begin{itemize} [noitemsep, topsep=3pt, partopsep=0pt, parsep=0pt]
     \item Queries must see all data that previous queries have seen.  
-    \item If a query has a later timestamp than an ongoing batch, it must wait for that batch to
-     finish processing before continuing.  
+    \item If a query has a higher than or equal to timestamp than an ongoing batch, 
+    it must wait for that batch to finish processing before continuing.  
 \end{itemize}  
 % 
 By enforcing this ordering, we ensure that queries always operate on a consistent view of the data.
@@ -314,35 +311,19 @@ The second approach we employ is inspired by \textit{linearizability}
 \cite{herlihyWingLinearizability}, a key concept in concurrent
 and distributed systems. Linearizability provides a strong consistency guarantee by ensuring
 that all operations appear to execute atomically in a single, consistent order.  
+% 
+A system is considered \textbf{linearizable} if:  
+ In each execution a, each implemented operation should have the same responce
+ as if it has executed serially (or atomically) at some point in its execution
+ interval. This point is called linearization point of the opration.
 
-Formally, a system execution is \textbf{linearizable} if:  
-\begin{itemize}  [noitemsep, topsep=3pt, partopsep=0pt, parsep=0pt]
-    \item For each completed operation p, to insert a
-    linearization point *p somewhere between p's
-    invocation and response in a.
-    \item To select a subset F of the incomplete operations,
-    and for each operation r in F:
-    to select a response, and
-    to insert a linearization point *r somewhere after r's invocation in a.
-    \item These operations and responses should be selected and these 
-    linearization points should be inserted, so
-    that, in the sequential execution constructed by
-    serially executing each operation at the point that
-    its linearization point has been inserted, the
-    response of each operation is the same as that in a
-\end{itemize} 
-% 
-By leveraging the principles of linearizability, we ensure that concurrent updates and queries
-interact correctly, preserving system correctness while maintaining high concurrency. 
-% 
 The Timestamp and Linearizability models complement each other by addressing different
 aspects of correctness in a dynamic, concurrent system, reflecting the principles of two
 distinct domains: the database world and the concurrent computing world.
 The timestamp model requires queries to wait for ongoing batches to finish before starting
-their processing. This ensures that any batch arriving before or concurrently with the query
-will be considered. This approach is generally preferred in the field of databases, as it
-respects the temporal sequence of batch arrivals and processing.
-On the other hand, linearizability offers more concurrency, as there is no waiting time.
-While data arrives, the algorithm is responsible for handling it, ensuring that the execution
-remains linearizable. This allows for concurrent operation throughout the entire process of
-insertions. 
+their processing. This ensures that the data series of any batch arriving before or concurrently 
+with a query will be considered when asnwering the query.
+This approach respects the temporal sequence of batch arrivals in query processing.
+On the other hand, linearizability allows fully concurrent updates and queries with no 
+waiting time. While data arrives, the algorithm is responsible for handling it, ensuring that the execution
+remains linearizable.
