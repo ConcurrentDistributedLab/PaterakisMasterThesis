@@ -2,14 +2,13 @@
 \label{chapter:Locality-aware}
 
 \begin{figure*}[tb]
-	\centering
-	\includegraphics[width=0.9\textwidth]{figures/locality-aware/Refresh_ekosmas_2-Themis.pdf}	
-	\vspace*{-0.8cm}
-	\caption{Refresh flowchart.}
-	\vspace*{-0.2cm}
+    \centering
+    \includegraphics[width=\textheight,angle=90]{figures/locality-aware/Refresh_ekosmas_2-Themis.pdf}
+    \caption{Refresh flowchart.}
 	\label{fig:refresh:flowchart}
 \end{figure*}
 
+\section{Static iSAX-based Indexes}
 
 {\em Locality-awareness}  aims at capturing several design principles (Definition~\ref{def:principles})
 for data series indexes which are crucial for achieving good performance.
@@ -19,16 +18,16 @@ A locality aware implementation respects these principles.
 \label{def:principles}
 Principles for {\em locality-aware} processing:
 \begin{enumerate}
-\item
+\item \normalfont
 {\bf Data Locality.} Separate the data into {\em disjoint sets} and have a distinct thread
 processing the data of each set. This results in reduced communication 
 cost (cache misses and branch misprediction) among the threads.
-\item
+\item \normalfont
 {\bf High Parallelism \& Low Synchronization Cost.} 
 Threads should work in parallel and independently from each other as much as possible. 
 Whenever synchronization cannot be avoided, design the appropriate 
 mechanisms to minimize its cost.
-\item
+\item \normalfont
 {\bf Load Balancing.} Share the workload equally to the different threads, thus
 avoiding load imbalances between threads and having all threads busy at each
 point in time. 
@@ -37,18 +36,18 @@ point in time.
 \end{definition}
 % 
 Enuring locality awareness results in good performance and is thus 
-a desirable property for big data processing. In existing iSAX-based indexes, 
+a desirable property for big data processing. In existing static  iSAX-based indexes, 
 a thread operates on chunks of \textit{RawData} and processes disjoint sets of summarization
 buffers and subtrees of the index tree. Also, an iSAX-based index employs 
 several priority queues to store leaf nodes containing candidate series.
 Thus, iSAX-based indexes are {\em locality-aware}.
-% 
+
 To describe \textit{ReFreSh} in more detail, consider a {\em blocking} locality-aware
 implementation $\mathcal{A}$, which splits its workload into disjoint parts and assigns them to 
 threads for processing. 
 % 
 The main idea behind it is to require from each thread that completes processing
-its own workload,(instead of blocking, waiting for other threads to also finish), 
+its own workload (instead of blocking, waiting for other threads to also finish) 
 to scan for unprocessed workloads (e.g. in an iSAX-based index, unprocessed parts of $RawData$
 or unprocessed summarization buffers), and help completing their processing. 
 
@@ -136,7 +135,7 @@ the following steps (depicted in Figure~\ref{fig:refresh:flowchart}):
 \end{enumerate}
 
 
-In locality-aware implementations, (e.g., in iSAX-based indexes), threads are expected to work
+In locality-aware implementations threads are expected to work
 on their own parts of the data most of the time ({\em contention-free phase}), and they
 may help other threads only for a small period of time at the end of their execution
 ({\em concurrent phase}).
@@ -146,7 +145,7 @@ Specifically, it employs two implementations for each data strucutre $D$ of  $\m
 one with low synchronization cost that does not support helping ({\em expeditive mode}),
 and another that supports helping and has higher synchronization overhead ({\em standard mode}).  
 To enable threads operate on the appropriate mode,  a {\em helping-indicator flag} $h_i$ 
-(initially \False) , $1 \leq i \leq k$, is attached with each $w_i$. , which indicates whether 
+(initially \False) , $1 \leq i \leq k$, is attached with each $w_i$, which indicates whether 
 $w_i$'s processing should be performed on expeditive or standard mode.
 % 
 A thread $t$ starts by processing its assigned workload 
@@ -169,62 +168,60 @@ and not the whole $w_i$. Thus, the redundant work is further decreased.
 To achieve this, the subparts of $w_i$ should have their own flag and helping-indicator variables.
 
 Lock-freedom is ensured due to the {\em helping code} (lines~\ref{alg:refresh:scan:ForAll}-
-\ref{alg:refresh:help:d:true}), In \textit{ReFreSh}, only after a thread
+\ref{alg:refresh:help:d:true}). In \textit{ReFreSh}, only after a thread
 $t$ processes a workload $w_i$, it sets $h_i$ to \True\, and $t$ performs 
-the helping code after finishing with their assigned workloads. Thus, when $t$ completes
+the helping code after finishing with its assigned workloads. Thus, when $t$ completes
 its helping code the processing of all parts of the workload has been completed. 
 This means that $t$ may continue directly to the execution of the next stage, without
 waiting for the other threads to complete the execution of the current stage. 
 Therefore, this scheme renders the use of barriers useless, as needed to achieve lock-freedom. 
 
-Summarizing, \textit{ReFreSh} is a general scheme for processing a locality-aware workload in a
-lock-free way, without sacrificing locality-awareness. 
+Summarizing, \textit{ReFreSh} is a general scheme for processing a locality-aware
+static workload in a lock-free way, without sacrificing locality-awareness. 
 
-\bl{
+
 \subsection{\textbf{ReFreSh with Dynamic Batches}}  
 
-\textit{ReFreSh} is designed to be applied once per workload. Threads begin execution in 
-\textit{expeditive mode} and switch to \textit{standard mode} when a helper arrives. However,
-in an iSAX-based index, \textit{ReFreSh} is applied to multiple phases, including the
-RawData array, summarization buffers, the iSAX tree, and the sorted arrays.  
-When data arrives dynamically in batches, \textit{ReFreSh} must be applied separately for each phase
-and its corresponding data structures. For data structures accessed only once per batch (e.g.,
-the RawData array), this does not introduce issues. However, for data structures accessed
-multiple times (e.g., summarization buffers and the iSAX tree), a challenge arises.  
+In an iSAX-based index, \textit{ReFreSh} is applied to all stages to implement the traverse
+method. When data arrives dynamically in batches, \textit{ReFreSh} must be applied to process
+each batch. This brings some complications when processing data structures such as the summarization
+buffers and the iSAX tree.
 % 
 The core issue lies in how \textit{ReFreSh} determines when to switch execution modes.
-Its behavior relies on boolean flags that initially have a value of \texttt{False} and transition
-to \texttt{True} during processing. After processing the first batch, subsequent batches will
-encounter these flags already set to \texttt{True}, causing \textit{ReFreSh} to always run
-in \textit{standard mode}. This is suboptimal because \textit{standard mode} enables helping,
-which is unnecessary unless a helper has actually arrived. To maintain performance,
-\textit{ReFreSh} must be modified to support batch processing effectively.  
+Its behavior relies on boolean flags that initially have a value of \texttt{False} to 
+indicate execution in expeditive mode and transition
+to \texttt{True} when processing becomes standard. After creating the initial index, processing any
+ongoing batche will encounter these flags already set to \texttt{True}, causing \textit{ReFreSh} to 
+run in \textit{standard mode}. This is suboptimal because \textit{standard mode} enables helping,
+which is unnecessary unless a helper has actually arrived. To avoid such uneccessary performance
+penalties,\textit{ReFreSh} must be modified to support dynamic batch processing effectively.  
 
-\subsubsection{\textbf{Modifications to Support Batches}}  
-
-To ensure \textit{ReFreSh} works correctly with dynamic batches, we introduce the following
-modifications:  
+To continue ensuring locality-awareness each batch is processed in a locality aware way. This means 
+that each batch $j$ let $w_j$ be the workload for processing $b_j$ and let $w_(j,i)$ 
+$1 \leq i \leq k$ be the parts of this workload. Thus, for each batch $b_j$ we define 
+flags $d_(j,i)$, $h_(j,i)$ and we run an instance of \Refresh. Moreover we apply the following
+modifications.
+\newline To accommodate dynamic batch processing in each batch $b_j$:
 
 \begin{enumerate}  
     \item \textbf{Replacing Boolean Flags with Counters:}  
-    Instead of using boolean flags, we replace them with counters. Each part $w_i$, where $1 \leq i
-    \leq k$, is assigned a counter $d_i$ (initially set to 0). This counter tracks whether $w_i$ has
-    completed processing for a specific batch. Once a thread finishes processing $w_i$, it
-    sets $d_i$ to $\mathit{currentBatch} + 1$, which corresponds to the ID of the next
+    Instead of using boolean flags, DFreSh replace them with counters. Each part $w_(j,i)$,
+    is assigned a counter $d_(j,i)$ (initially set to 0). This counter tracks whether $w_(j,i)$ has
+    completed processing part $w_(j,i)$ for $b_j$. Once a thread finishes processing $w_(j,i)$, it
+    sets $d_(j,i)$ to $\mathit{currentBatch} + 1$, which corresponds to the ID of the next
     batch (see Algorithm~\ref{alg:DRefresh}).  
 
     \item \textbf{Batch-Aware Execution of \textit{ReFreSh}:}  
-    \textit{ReFreSh} is executed once per batch. Each time it runs, it requires the ID of the
-    batch it is processing. The counter values are interpreted accordingly:  
+    Each time \textit{ReFreSh} is executed while processing $b_j$. The following holds:
     \begin{itemize}  
-        \item A part $w_i$ is considered processed for a batch with ID $X$ when $d_i = X + 1$.  
-        \item A helper has arrived at part $h_i$ for an update batch with ID $X$ when $h_i = X + 1$.  
+        \item A part $w_(j,i)$ is considered processed for a batch with ID $J$ when $d_(j,i) = J + 1$.  
+        \item A helper has arrived at part $w_(j,i)$ for batch $b_j$ when $h_(j,i) = J + 1$.  
     \end{itemize}  
 \end{enumerate}  
-
-By implementing these modifications, \textit{ReFreSh} maintains its efficiency across
-multiple dynamic batches while ensuring that execution mode transitions occur only when necessary.
-
+% 
+By implementing these modifications, \textit{ReFreSh}  ensures that execution mode transitions 
+occur only when necessary, thus maintaining its efficiency while processing multiple dynamic batches.
+These changes on Algorithm~\ref{alg:refresh} are illustrated with red in Algorithm~\ref{alg:DRefresh}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Dynamic Refresh %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -235,80 +232,79 @@ multiple dynamic batches while ensuring that execution mode transitions occur on
     \begin{algorithmic}[1]
     
     \State \textbf{Shared variables:}
-    \State Workload part $\mathit{W} := \mathit{[w_1, w_2, \ldots, w_k]}$ \label{alg:DRefresh:w}
-    \State \textbf{int} $\mathit{F} := \mathit{[d_1, d_2, \ldots, d_k]}$, initially $\mathit{d_i} = 0, \forall i \in [1, k]$ \label{alg:DRefresh:d}
-    \State \textbf{int} $\mathit{H} := \mathit{[h_1, h_2, \ldots, h_k]}$, initially $\mathit{h_i} = 0, \forall i \in [1, k]$ \label{alg:DRefresh:h}
+    \State Workload part $\mathit{W_j} := \mathit{[w_(j,1), w_(j,2), \ldots, w_(j,k)]}$ \label{alg:DRefresh:w}
+    \State \textbf{Int} array $\mathit{F} := \mathit{[d_(j,1), d_(j,2), \ldots, d_(j,k)]}$, initially $\mathit{d_i} = 0, \forall i \in [1, k]$ \label{alg:DRefresh:d}
+    \State \textbf{Int} array $\mathit{H} := \mathit{[h_(j,1), h_(j,2), \ldots, h_(j,k)]}$, initially $\mathit{h_i} = 0, \forall i \in [1, k]$ \label{alg:DRefresh:h}
     
     \vspace*{1mm}
     \State \textbf{Code for each thread:}
     
-    \Procedure{DRefresh}{int $\mathit{currentBatch}$}
+    \Procedure{DRefresh}{int $\mathit{j}$}
         \While{$\mathit{W}$ has available parts} \label{alg:DRefresh:process:start}
-            \State $\mathit{w_i} \gets$ acquire an available part of $\mathit{W}$
-            \State Mark $\mathit{w_i}$ as acquired
-            \If{$(\mathit{h_i} == \mathit{currentBatch})$ \textbf{or} $(\mathit{d_i} == \mathit{currentBatch}$ 
-            \textbf{and} $\mathit{h_i} < \mathit{currentBatch})$} \label{alg:DRefresh:process:if}
-                \State Process $\mathit{w_i}$ in expeditive mode, while checking the value of $h_i$ \label{alg:DRefresh:process:expeditive}
-                \If{$\mathit{h_i} == \mathit{currentBatch} + 1$}
+            \State $\mathit{w_(j,i)} \gets$ acquire an available part of $\mathit{W_j}$
+            \State Mark $\mathit{w_(j,i)}$ as acquired \label{alg:DFreSh:acquire-part}
+            \If{\rb{$(\mathit{h_(j,i)} == \mathit{J})$} \textbf{or} \rb{$(\mathit{d_(j,i)} == \mathit{j}$ 
+            \textbf{and} $\mathit{h_(j,i)} < \mathit{j})$}} \label{alg:DRefresh:process:if}
+                \State Process $\mathit{w_(j,i)}$ in expeditive mode, while checking the value of $h_(j,i) \leq j$ \label{alg:DRefresh:process:expeditive}
+                \If{\rb{$\mathit{h_(j,i)} == \mathit{J} + 1$}}\label{alg:DFreSh:switch-mode}
                     \State Switch to standard mode
                 \EndIf
             \Else
-                \State Process $\mathit{w_i}$ in standard mode   \label{alg:DRefresh:process:standard}
+                \State Process $\mathit{w_(j,i)}$ in standard mode \label{alg:DRefresh:process:standard}
             \EndIf
-            \If{$\mathit{d_i} == \mathit{currentBatch}$}
-                \State $\mathit{CAS(\&d_i, currentBatch, currentBatch+1)}$ \label{alg:DRefresh:d:increase}
-            \EndIf
+            \State \rb{$\mathit{CAS(\&d_(j,i), j, j+1)}$} \label{alg:DRefresh:d:increase}
         \EndWhile
         
-        \ForAll{$\mathit{d_i} \in D$ where $\mathit{d_i} == \mathit{currentBatch}$} \label{alg:DRefresh:scan:ForAll} 
-            \State Backoff to avoid helping if possible \label{alg:DRefresh:help:backoff}
-            \If{$\mathit{d_i} == \mathit{currentBatch}$} \label{alg:DRefresh:help:if}
-                \If{$\mathit{h_i} == \mathit{currentBatch}$} \label{alg:DRefresh:h:true}
-                    \State $\mathit{CAS(\&h_i, currentBatch, currentBatch+1)}$ 
-                \ElsIf{$\mathit{h_i} < \mathit{currentBatch}$}      \label{alg:DRefresh:h:fallenBehind}
-                    \State \textbf{int} oldVal $\gets \mathit{h_i}$
-                    \State $\mathit{CAS(\&h_i, oldVal, currentBatch+1)}$
+        \ForAll{$\mathit{d_(j,i)} \in D$ where $\mathit{d_(j,i)} == \mathit{j}$} \label{alg:DRefresh:scan:ForAll} 
+            \State Backoff() \label{alg:DRefresh:help:backoff}
+            \rb{\If{$\mathit{d_(j,i)} == \mathit{j}$} \label{alg:DRefresh:help:if}
+                \If{$\mathit{h_(j,i)} == \mathit{j}$} \label{alg:DRefresh:h:true}
+                    \State $\mathit{CAS(\&h_(j,i), j, j+1)}$ 
+                \ElsIf{$\mathit{h_(j,i)} < \mathit{j}$}      \label{alg:DRefresh:h:fallenBehind}
+                    \State \textbf{int} oldVal $\gets \mathit{h_(j,i)}$
+                    \State $\mathit{CAS(\&h_(j,i), oldVal, j+1)}$ \label{alg:DRefresh:h:CAS}
                 \EndIf
             \EndIf
-            \State Process $\mathit{w_i}$ in standard mode, checking $\mathit{d_i}$
-            \If{$\mathit{d_i} == \mathit{currentBatch}$}
-                \State $\mathit{CAS(\&d_i, currentBatch, currentBatch+1)}$ \label{alg:DRefresh:help:d:true}
-            \EndIf
+            }
+            \State Process $\mathit{w_(j,i)}$ in standard mode, checking $\mathit{d(j,i)} == j$
+            \rb{\State $\mathit{CAS(\&d_(j,i), j, j+1)}$ }\label{alg:DRefresh:help:d:true}
         \EndFor
     \EndProcedure
     
     \end{algorithmic}
     
-    \caption{Dynamic Refresh - A general approach for transforming a blocking data structure $\mathit{D}$ of a big-data application $\mathcal{A}$ into a lock-free one that supports dynamic insertions.}
+    \caption{Dynamic version of ReFresh - Code for processing batch $B_j$.}
     \label{alg:DRefresh}
     \end{algorithm}
 
-    \newpage
+    We explain these changes in more detail below.
 
     \begin{enumerate}
-        \item As in \textit{ReFreSh}, threads acquire parts of the batch $W$ for processing until
-        all parts have been claimed. Each thread must determine the appropriate processing mode.
-        A helper has arrived at part $w_i$ if the value of $h_i$ is equal to the current batch ID + 1.
-        The same applies to the processing of $d_i$. Once a thread finishes processing a part, it must
-        atomically increment $d_i$ using a compare-and-swap (CAS) operation to ensure correctness, as
-        multiple helpers may attempt to update it simultaneously (lines~\ref{alg:DRefresh:process:start}-
-        \ref{alg:DRefresh:d:increase}).  
+        \item As in \textit{ReFreSh}, threads acquire parts (line~\ref{alg:DFreSh:acquire-part}) of the
+        workload $W_j$ of batch $B_j$ for processing until all parts have been acquired. Each thread
+        must determine the appropriate processing mode (lines~\ref{alg:DRefresh:process:if}-
+        \ref{alg:DRefresh:process:standard}). A helper has arrived at part $w_(j,i)$ of
+        batch $B_j$ if the value of $h_(j,i)$ is equal to $J + 1$ (line~\ref{alg:DFreSh:switch-mode}).
+        Similarly a part $W_(j,i)$ is considered processed if the value of $d_(j,i)$ is equal to $j+1$.
+        Once a thread finishes processing a part, it must try to atomically increment $d_(j,i)$ using a
+        compare-and-swap (CAS) operation to ensure correctness, as multiple threads may attempt
+        to update it simultaneously (line~\ref{alg:DRefresh:d:increase}).
     
-        \item To maintain lock-freedom, every thread $t$ scans all counters  
-        ($d_i$, $1 \leq i \leq k$) to identify unfinished parts (line~\ref{alg:DRefresh:scan:ForAll}).  
-    
-        \item Thread $t$ {\em helps} by processing, one after another, each part that remains unfinished  
-        after the scan. A part $w_i$ is considered unfinished when its corresponding $d_i$ value  
-        is equal to the current batch ID. While processing, thread $t$ periodically checks $d_i$  
-        to determine whether other threads have already completed $w_i$. For each part $w_i$ that $t$
-        helps, it must announce that a helper has arrived by updating the value of $h_i$.  
-        In the base case, where helping occurred for this part in the previous batch, $h_i$ is updated
-        atomically using CAS (line~\ref{alg:DRefresh:h:true}). However, there are cases where $h_i$
-        may lag behind for certain parts, as helping is not always required in every batch. For example,
-        if a thread completes processing a part before a helper arrives, the corresponding $h_i$ value
-        remains unchanged (line~\ref{alg:DRefresh:h:fallenBehind}). Once a thread finishes processing
-        $w_i$, it attempts to update $d_i$ to the current batch ID + 1 
-        (line~\ref{alg:DRefresh:help:d:true}).  
+        \item To maintain lock-freedom, after all parts become acquired every thread $t$ 
+        has to check for unfinished parts in case some threads become slow
+        (lines~\ref{alg:DRefresh:scan:ForAll}-\ref{alg:DRefresh:help:d:true}). A part 
+        $W_(j,i)$ is considered unprocessed if the value of $d_(j,1)$ is equal to $j$.
+          
+        \item While processing unfinished parts of batch $b_j$ thread $t$ periodically checks $d_(j,i)$  
+        to determine whether other threads have already completed the processing of part $w_(j,i)$.
+        For each unfinished part $w_(j,i)$ that thread $t$ encounters, it first attempts to inform other
+        threads that may be working on the same part that multiple threads are now processing it
+        concurrently. To better understand the pseudocode, let's focus on a specific $i$ and analyze
+        what happens with helpers on the $I_th$ part of each batch. If, during the processing of the
+        previous batch, a helping thread existed for part $w_(j,i)$ then the if condition
+        on line~\ref{alg:DRefresh:h:true} is executed. Otherwise, if there was no helper because that
+        part was already processed during the scan (lines~\ref{alg:DRefresh:scan:ForAll}-\ref{alg:DRefresh:help:if})
+        the else if condition on line (line~\ref{alg:DRefresh:h:fallenBehind}) is executed. 
+        The compare-and-swap (CAS) has to figure out the correct old value to use in order to update
+        the value of the flag (line~\ref{alg:DRefresh:h:CAS}).
     \end{enumerate}
-    
-}
