@@ -1,6 +1,7 @@
 \chapter{Preliminaries}
 \label{chapter:prelemenaries}
 
+\vspace{-0.5cm}
 \section{Data Series And Similarity Search}
 
 A \textbf{data series (DS)} of size (or dimensionality) \( n \) is a sequence 
@@ -13,7 +14,7 @@ provides a compact representation of a data series by dividing the x-axis into
 of the corresponding points, as shown by the black horizontal lines in 
 Figure~\ref{fig:PAA}. 
 % 
-\bl{
+
 The PAA representation of a data series \( T = (t_1, t_2, \dots, t_n) \) is computed by 
 dividing it into \( w \) segments, each containing \( \frac{n}{w} \) data points. The 
 \( i \)-th PAA coefficient \( \overline{t}_i \) is given by:  
@@ -25,7 +26,7 @@ dividing it into \( w \) segments, each containing \( \frac{n}{w} \) data points
 % 
 where the summation aggregates all values in the segment, and the factor \( \frac{w}{n} \) 
 ensures proper scaling.  
-}
+
 % 
 To compute the \textbf{iSAX summary}~\cite{shieh2008sax}, the y-axis is partitioned 
 into \( c \) discrete regions, where \( c \) represents the \textbf{cardinality} 
@@ -102,7 +103,7 @@ ED(T, T') = \sqrt{\sum_{i=1}^{n} (t_i - t'_i)^2}
 \end{equation} 
 % 
 We refer to the distance between the \textit{iSAX summaries} of two data series  
-as the \textbf{lower-bound distance}. \bl{If we transform the original subsequences into PAA
+as the \textbf{lower-bound distance}. If we transform the original subsequences into PAA
 representations, $\overline{T}$ and $\overline{T'}$, using Eq.~\ref{eq:paa-transformation}
 (according to~\cite{Lin2007SAX}),
 we can then obtain a lower bounding approximation of the Euclidean distance
@@ -112,7 +113,7 @@ between the original subsequences by:
 DR(\overline{T}, \overline{T'}) \equiv \sqrt{\frac{n}{w}} \sqrt{\sum_{i=1}^{w} (\overline{t}_{i} - \overline{t'}_{i})^2}
 \label{eq:lower-bound-distance}
 \end{equation}
-}
+
 % 
 The calculation of this distance guarantees the \textbf{pruning property}:  
 the lower-bound distance between two data series is always less than or equal to  

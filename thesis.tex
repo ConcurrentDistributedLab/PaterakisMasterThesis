@@ -701,13 +701,33 @@ or when processing the new child nodes after the split.
 
 \include{src/evaluation}
 
+\chapter{Conclusions}
+\label{chapter:Conclusions}
 
+Current state-of-the-art data series indexes exploit the parallelism
+supported by modern multicore machines, yet, their
+design is lock-based, and therefore, these implementations are
+blocking. Additionally, these indexes are static, meaning they do not support
+dynamic insertions after construction, making them unsuitable for real-time systems.
+In this paper, we present FreSh, a lock-free index,
+based on Refresh, our novel generic approach for designing,
+building and analyzing highly-efficient data series indexes in a
+modular way. The experimental evaluation demonstrates that
+FreSh performs as good as the state-of-the-art blocking index,
+thus, adhering to the same locality-aware design principles.
+We also extend FreSh with a dynamic variant that supports batch insertions
+alongside query processing, maintaining the strong performance characteristics of FreSh.
+
+While our work focuses on batch insertions, an important open direction is supporting
+fully streaming workloads, where data arrives continuously and must be indexed in real
+time without predefined batch boundaries. Efficiently handling streaming updates while
+preserving query consistency and performance remains an open challenge for future research.
 
 
 
 % %BIB
 \bibliographystyle{plain}
-\cleardoublepage
+% \cleardoublepage
 \addcontentsline{toc}{chapter}{Bibliography}
 \bibliography{bib/thesis}
 

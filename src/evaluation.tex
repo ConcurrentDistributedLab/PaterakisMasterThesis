@@ -72,7 +72,7 @@ We also compare \Fresh\ against an extended version of MESSI, called \MESSIenh
 , that allows several threads to concurrently populate the same sub-tree, during tree creation
 (instead of using a single thread for each subtree).
 This is implemented using fine-grained locks that are attached on each leaf node of a subtree.
-\MESSIenh\ allows to compare the lock-free index creation phase of \Fresh\ against a more
+\MESSIenh\ allows to compare the lock-free index construction phase of \Fresh\ against a more
 efficient blocking one than that of original \MESSI.
 
 Figure~\ref{fig:eval:fresh-messi-threads:random} shows that all algorithms
@@ -82,7 +82,7 @@ Moreover, the total execution time of \Fresh\
 (Figure~\ref{fig:eval:fresh-messi-threads:random:total-from-4})
 is almost the same as the total execution time of all its competitors, although it is the
 only lock-free approach. 
-As expected, the tree index creation time of \Fresh\ is smaller than \MESSI's 
+As expected, the tree index construction time of \Fresh\ is smaller than \MESSI's 
 (Figure~\ref{fig:eval:fresh-messi-threads:random:tree-from-4}), since \Fresh\ allows
 subtrees to be populated concurrently by multiple threads, allowing parallelism during
 this phase, in contrast to \MESSI. 
@@ -218,7 +218,7 @@ the Seismic dataset, where \Fresh\ performs better than \MESSI\ in most cases.
     % \end{subfigure}    
 
     \caption{(a) Comparison of \Fresh\ against \MESSI\ on Seismic 100GB with variable query difficulty, where an increasing percentage of noise is added to the original queries.
-    (b)-(c) Comparison of \Fresh\ index creation to other tree implementations.}
+    (b)-(c) Comparison of \Fresh\ index construction to other tree implementations.}
     \label{fig:eval:scale-dataset:tree-index}
 \end{figure*}
 
@@ -340,7 +340,7 @@ Figure~\ref{fig:eval:baselines:random:100GB:query-answering}),.
 \end{figure*}
 
 
-%\subsection{Performance breakdown for index creation phase.}
+%\subsection{Performance breakdown for index construction phase.}
 
 We evaluate the techniques incorporated by \Fresh\ to create its
 tree index by comparing it against three modified versions of it. 
@@ -493,29 +493,32 @@ its processing.
 As mentioned earlier, queries arrive in batches along with the update batch, meaning 
 that all queries in a batch share the same arrival time. The latency of a query is 
 defined as the time required to process all pending queries that arrived before it.
-%
+
 When the delay is long enough to process all queries in a batch, the latency of the 
 $i$-th query can be calculated as the sum of the times required to answer all previous 
 queries in the same batch:
-
-\begin{equation}
-\text{Latency}(q[i]) = \sum_{j=0}^{i-1} \text{qa}[j]
-\end{equation}
 % 
 where $\text{qa}[j]$ represents the time needed to answer the $j$-th query.
 % 
 However, if the delay is not sufficient to process all queries within a batch, 
 the latency of the $i$-th query is calculated differently. It includes the time 
-required to answer the pending queries from previous updates (queries from previous batches) 
-and the time for all the queries that arrived before the $i$-th query in the current batch:
+required to answer the pending queries from previous batches (first sum of the equation) 
+and the time for all the queries that arrived before the $i$-th query in the current batch
+(second sum of the equation):
+
 
 \begin{equation}
-\text{Latency}(q[i]) = \sum_{j=k}^{n-1} \text{qa}[j] + \sum_{j=0}^{i-1} \text{qa}[j],
+\text{Latency}(q[i]) =
+\begin{cases}
+    \sum_{j=0}^{i-1} \text{qa}[j], & \text{(Sufficient Delay)} \\[10pt]
+    \sum_{j=k}^{n-1} \text{qa}[j] + \sum_{j=0}^{i-1} \text{qa}[j], & \text{(Insufficient Delay)}  \\[10pt]
+\end{cases}
 \end{equation}
+\begin{center}
+    \text{Equation 6.1: DFreSh Latency calculation.}
+\end{center} 
 % 
-where the first sum accounts for the pending queries from previous updates
-and the second sum accounts for the queries from the current batch up to the $i$-th query.
-%
+
 For \Fresh\, calculating latency is more complicated because it is a static index, meaning 
 query answering begins only after the index construction is complete. The time available 
 for answering queries in a given update batch can be expressed as:
@@ -526,36 +529,40 @@ for answering queries in a given update batch can be expressed as:
 where $\text{AvailableQA}(qa[i])$ represents the available time for answering queries 
 in the $i$-th update batch, $\text{DELAY}$ is the delay interval, and $\text{IC}[i]$ 
 is the time required to insert the $i$-th batch into the index.
+ 
+If the delay is sufficient to answer all the queries of a batch in time, the latency
+can be calculated by the formula shown in Equation 6.3. It is the sum
+of the time needed to insert the batch into the index ($\text{IC}[i]$) plus the query 
+answering time for all queries before $i$ ($\text{qa}[j]$).
+ 
+If the delay is insufficient, unanswered queries from the current batch remain
+pending and carry over to the next query answering period. These pending queries
+will be processed during the $\text{AvailableQA}(qa[i+1])$ interval of the subsequent
+update batch. In this case, the latency is calculated using the second clause of
+Equation 6.3. Since queries have been added to the next batch, the latency increases,
+as we must now also wait for the insertion of the new batch. 
 % 
-If the delay is sufficient to answer all the queries in time, the latency can be calculated as:
+If there are pending queries from previous batches, the latency of a query increases by
+the query answering time of all pending queries. Therefore, the general formula for
+calculating latency in \Fresh\ is provided in the third branch of Equation 6.3.
+Given a query $i$ in the $n$-th batch, which is answered during the available time of
+the $m$-th batch, the latency is the sum of the time required to insert all batches from
+$n$ to $m$, plus any queries that were appended to the $n$-th batch and belong to previous
+batches, along with the query answering time of all queries up to the $i$-th query.
 
 \begin{equation}
-\text{Latency}(q[i]) = \text{IC}[i] + \sum_{j=0}^{i-1} \text{qa}[j],
+\text{Latency}(q[i]) =
+\begin{cases}
+    \text{IC}[i] + \sum_{j=0}^{i-1} \text{qa}[j], & \text{(FreSh: Sufficient)} \\[10pt]
+    \sum_{k=n}^{m} \text{IC}[k] + \sum_{j=0}^{i-1} \text{qa}[j], & \text{(FreSh: Insufficient)} \\[10pt]
+    \sum_{k=n}^{m} \text{IC}[k] + \sum_{j=p}^{pq} \text{qa}[j] + \sum_{j=0}^{i-1} \text{qa}[j], & \text{(Case 5)}
+\end{cases}
 \end{equation}
-% 
-where $\text{IC}[i]$ represents the time to append the $i$-th batch to the index, and 
-$\text{qa}[j]$ is the time required to answer the $j$-th query. If the delay is insufficient, 
-unanswered queries from the current batch remain pending and carry over to the next query 
-answering period. These pending queries will be processed during the 
-$\text{AvailableQA}(qa[i+1])$ interval of the subsequent update batch. 
-Thus, the latency can be calculated as:
+\begin{center}
+    \text{Equation 6.2: FreSh Latency calculation.}
+\end{center} 
 
-\begin{equation}
-\text{Latency}(q[i]) = \sum_{k=n}^{m} \text{IC}[k] + \sum_{j=0}^{i-1} \text{qa}[j],
-\end{equation}
-% 
-where the $n$-th batch contains the queries in question, and the $m$-th batch represents 
-when query $i$ is being answered. If the current batch also includes pending queries from 
-previous batches, the latency must also account for the time to answer those queries. 
-Thus, the general formula for calculating latency in \Fresh\ is:
-% 
-\begin{equation}
-\text{Latency}(q[i]) = \sum_{k=n}^{m} \text{IC}[k] + \sum_{j=p}^{pq} \text{qa}[j] + \sum_{j=0}^{i-1} \text{qa}[j],
-\end{equation}
-% 
-where $n$ represents the batch that contains the query $i$,-th 
-$m$ represents the batch the the $i$-th query is being answered, 
-and queries $p$ to $pq$ represents the pending queries from previous baches.
+
 
 
 \noindent{\bf Dynamic FreSh vs FreSh.}
@@ -759,22 +766,22 @@ the available time.
 %%%%%%%%%Intermediate delays 3sec
 \begin{figure*}
 	\centering
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/3/average_query_time_per_batch_version_999777015_10485760_10_delay[3].png}
 		\caption{Logical TS buffers}
 		\label{fig:progress-queries-3-logical}
 	\end{subfigure}
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/3/average_query_time_per_batch_version_999777018_10485760_10_delay[3].png}
 		\caption{System TS buffers}
 		\label{fig:progress-queries-3-system}
 	\end{subfigure}
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/3/average_query_time_per_batch_version_999777016_10485760_10_delay[3].png}
 		\caption{Logical TS No buffers}
 		\label{fig:progress-queries-3-logical-no-buffers}
 	\end{subfigure}
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/3/average_query_time_per_batch_version_999777017_10485760_10_delay[3].png}
 		\caption{System TS No buffers}
 		\label{fig:progress-queries-3-system-no-buffers}
@@ -787,22 +794,22 @@ the available time.
 %%%%%%%%%Intermediate delays 5sec
 \begin{figure*}
 	\centering
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/5/average_query_time_per_batch_version_999777015_10485760_10_delay[5].png}
 		\caption{Progress of Queries Logical TS buffers}
 		\label{fig:progress-queries-5-logical}
 	\end{subfigure}
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/5/average_query_time_per_batch_version_999777018_10485760_10_delay[5].png}
 		\caption{Progress of Queries System TS buffers}
 		\label{fig:progress-queries-5-system}
 	\end{subfigure}
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/5/average_query_time_per_batch_version_999777016_10485760_10_delay[5].png}
 		\caption{Progress of Queries Logical TS No buffers}
 		\label{fig:progress-queries-5-logical-no-buffers}
 	\end{subfigure}
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/5/average_query_time_per_batch_version_999777017_10485760_10_delay[5].png}
 		\caption{Progress of Queries System TS No buffers}
 		\label{fig:progress-queries-5-system-no-buffers}
@@ -815,22 +822,22 @@ the available time.
 %%%%% LARGEST DELAY
 \begin{figure*}
 	\centering
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/7/average_query_time_per_batch_version_999777015_10485760_10_delay[7].png}
 		\caption{Progress of Queries Logical TS buffers}
 		\label{fig:progress-queries-7-logical}
 	\end{subfigure}
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/7/average_query_time_per_batch_version_999777018_10485760_10_delay[7].png}
 		\caption{Progress of Queries System TS buffers}
 		\label{fig:progress-queries-7-system}
 	\end{subfigure}
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/7/average_query_time_per_batch_version_999777016_10485760_10_delay[7].png}
 		\caption{Progress of Queries Logical TS No buffers}
 		\label{fig:progress-queries-7-logical-no-buffers}
 	\end{subfigure}
-	\begin{subfigure}[c]{0.4\textwidth}
+	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/7/average_query_time_per_batch_version_999777017_10485760_10_delay[7].png}
 		\caption{Progress of Queries System TS No buffers}
 		\label{fig:progress-queries-7-system-no-buffers}
@@ -1197,22 +1204,22 @@ with patterns aligning well with our observations from earlier experiments.
 \begin{figure*}
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/batch_answering/25/average_query_time_per_batch_version_999777015_10485760_10_delay[25].png}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/25/average_query_time_per_batch_version_999777015_10485760_10_delay[25].png}
 		\caption{Seismic: Logical TS Buffers}
 		\label{fig:logical-ts-25-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/25/average_query_time_per_batch_version_999777018_10485760_10_delay[25].png}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/25/average_query_time_per_batch_version_999777018_10485760_10_delay[25].png}
 		\caption{Seismic: System TS Buffers}
 		\label{fig:system-ts-25-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/25/average_query_time_per_batch_version_999777016_10485760_10_delay[25].png}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/25/average_query_time_per_batch_version_999777016_10485760_10_delay[25].png}
 		\caption{Seismic: Logical TS No Buffers}
 		\label{fig:logical-ts-no-25-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/25/average_query_time_per_batch_version_999777017_10485760_10_delay[25].png}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/25/average_query_time_per_batch_version_999777017_10485760_10_delay[25].png}
 		\caption{Seismic: System TS No Buffers}
 		\label{fig:system-ts-no-25-seismic}
 	\end{subfigure}
@@ -1223,22 +1230,22 @@ with patterns aligning well with our observations from earlier experiments.
 \begin{figure*}
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/batch_answering/35/average_query_time_per_batch_version_999777015_10485760_10_delay[35].png}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/35/average_query_time_per_batch_version_999777015_10485760_10_delay[35].png}
 		\caption{Seismic: Logical TS Buffers}
 		\label{fig:logical-ts-35-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/35/average_query_time_per_batch_version_999777018_10485760_10_delay[35].png}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/35/average_query_time_per_batch_version_999777018_10485760_10_delay[35].png}
 		\caption{Seismic: System TS Buffers}
 		\label{fig:system-ts-35-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/35/average_query_time_per_batch_version_999777016_10485760_10_delay[35].png}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/35/average_query_time_per_batch_version_999777016_10485760_10_delay[35].png}
 		\caption{Seismic: Logical TS No Buffers}
 		\label{fig:logical-ts-no-35-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/35/average_query_time_per_batch_version_999777017_10485760_10_delay[35].png}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/35/average_query_time_per_batch_version_999777017_10485760_10_delay[35].png}
 		\caption{Seismic: System TS No Buffers}
 		\label{fig:system-ts-no-35-seismic}
 	\end{subfigure}
@@ -1249,22 +1256,22 @@ with patterns aligning well with our observations from earlier experiments.
 \begin{figure*}
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/batch_answering/50/average_query_time_per_batch_version_999777015_10485760_10_delay[50].png}
+		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/50/average_query_time_per_batch_version_999777015_10485760_10_delay[50].png}
 		\caption{Seismic: Logical TS Buffers}
 		\label{fig:logical-ts-50-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/50/average_query_time_per_batch_version_999777018_10485760_10_delay[50].png}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/50/average_query_time_per_batch_version_999777018_10485760_10_delay[50].png}
 		\caption{Seismic: System TS Buffers}
 		\label{fig:system-ts-50-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/50/average_query_time_per_batch_version_999777016_10485760_10_delay[50].png}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/50/average_query_time_per_batch_version_999777016_10485760_10_delay[50].png}
 		\caption{Seismic: Logical TS No Buffers}
 		\label{fig:logical-ts-no-50-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
-		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/batch_answering/50/average_query_time_per_batch_version_999777017_10485760_10_delay[50].png}
+		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/50/average_query_time_per_batch_version_999777017_10485760_10_delay[50].png}
 		\caption{Seismic: System TS No Buffers}
 		\label{fig:system-ts-no-50-seismic}
 	\end{subfigure}
@@ -1282,9 +1289,10 @@ previous sections, and the observed pattern is consistent with our expectations.
 
 \begin{figure*}
 	\centering
-	\begin{subfigure}[c]{0.48\textwidth}
+	\begin{subfigure}[c]{0.6\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/average_latency_SEISMIC.png}
 	\end{subfigure}
 	\caption{Seismic: Query Latency - 90GB/400Q}
 	\label{fig:query-latency-seismic}
 \end{figure*}
+
