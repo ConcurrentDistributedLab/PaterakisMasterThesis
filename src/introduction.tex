@@ -1,119 +1,102 @@
 \chapter{Introduction}
 \label{chapter:introduction}
 
+Processing big collections of data series is of paramount importance 
+for a wide spectrum of applications, across many domains, such as: operation health
+monitoring in data centers, vehicles and manufacturing processes, internet of things data
+analysis, environmental and climate monitoring, energy consumption analysis, decision taking
+in financial markets, telecommunications traffic analysis, detection of medical and health problems,
+improvement of web-search results, identification of pests invading agricultural crops,
+etc.~\cite{DBLP:journals/sigmod/Palpanas15,DBLP:journals/dagstuhl-reports/BagnallCPZ19,Palpanas2019}.
+In the heart of analyzing such collections 
+lies the process of similarity search. 
+Given a query series $Q$, {\em similarity search} 
+returns a set of data series from the collection that have the closest 
+distance to $Q$. Similarity search comes at considerable cost, 
+due to very large size of data series collections and the
+high dimensionality (i.e., length) of the data series that modern applications need to analyze. 
+To address these challenges, current state-of-the-art data series 
+indexes~\cite{DBLP:journals/pvldb/EchihabiZPB18,isax2plus,wang2013data,peng2018paris,parisplus,peng2020messi,PFP21-I,PFP21-II,hercules,dumpy}
+are based on data series summarization. They develop a tree index containing
+data series summaries used to prune the series collection in order to
+restrict the execution of costly computations only to a small subset of it.
 
-Processing large collections of data series is critical for a wide range of applications
-~\cite{DBLP:journals/sigmod/Palpanas15,DBLP:journals/dagstuhl-reports/BagnallCPZ19,Palpanas2019}.
-These applications depend on efficient similarity search, which aims to retrieve the most similar
-data series to a given query $Q$.
-Specifically, a similarity search operation returns a subset of data series from the collection 
-that are closest to $Q$  based on a defined distance metric (or similarity function).
-% 
-Beyond its standalone utility, similarity search is also a key component in various machine 
-learning tasks, including clustering, classification, and outlier detection. However, 
-performing similarity search at scale is computationally expensive due to two main factors: 
-\begin{itemize}
-\item The massive size of modern data series collections, which often reach terabyte or petabyte scales.
-\item The high dimensionality of data series (i.e. length) that modern applications need to analyze.
-\end{itemize}
-% 
-To overcome these challenges, state-of-the-art data series indexes
-~\cite{DBLP:journals/pvldb/EchihabiZPB18,isax2plus,wang2013data,peng2018paris,parisplus,peng2020messi,PFP21-I,PFP21-II,hercules,dumpy}
-employ data series summarization. These indexes build tree-based structures where each node 
-stores summarized representations of data series, enabling efficient pruning of the dataset.
-By filtering out irrelevant series early, these indexes significantly reduce the number of costly 
-distance computations, improving query performance.
-State-of-the-art such indexes~\cite{peng2020messi,parisplus,peng2021sing} 
-use iSAX summaries~\cite{isax2plus,isaxfamily},thus we call them iSAX-based indexes.  
-%
-Due to their efficiency and scalability, iSAX-based indexes have been widely adopted across 
-diverse application domains. These include operational health monitoring in data centers, 
-vehicles, and manufacturing processes; Internet of Things (IoT) data analysis; environmental 
-and climate monitoring; energy consumption analysis; financial market decision-making; 
-telecommunications traffic analysis; medical diagnostics; web search optimization; 
-and even agriculture, where they help identify pest infestations in crops.
-%
-To efficiently support these real-world use cases, state-of-the-art data series indexes
-~\cite{DBLP:journals/pvldb/EchihabiZPB18,isaxfamily,peng2018paris,peng2020messi,PFP21-I,PFP21-II,hercules} 
-leverage modern multicore architectures to achieve parallelism. However, most existing 
-approaches rely on lock-based synchronization mechanisms, which introduce blocking behavior:
-if a thread holding a lock fails or is delayed, other threads waiting on the lock are forced to stall,
-leading to degraded performance.
-While thread failures are relatively rare, they do occur in practice, for example, due to 
-software bugs in applications using the index or issues in memory management systems. 
-This is especially problematic for mission-critical applications, such as nuclear plant 
-monitoring or gravitational-wave detection in astrophysics, where any delay in data processing 
-can have significant consequences. Such latency-sensitive applications would greatly benefit
-from our proposed approach, which eliminates blocking and ensures continuous progress.
-%
-While locks provide synchronization, they introduce well-known performance issues, 
-such as priority inversion and convoying~\cite{F04}. Additionally, depending on how they
-are used, locks can limit parallelism, leading to suboptimal performance
+State-of-the-art data series indexes~\cite{DBLP:journals/pvldb/EchihabiZPB18,isaxfamily,peng2018paris,peng2020messi,PFP21-I,PFP21-II,hercules} 
+exploit the parallelism supportedby modern multicore machines,  
+but are largely lock-based to achieve synchronization. 
+Using locks results in {\em blocking} implementations: if a thread that
+holds a lock delays, other threads block, without making any progress,  
+until the lock is released. Such thread delays  can degrade performance. 
+Some applications (eg, operation health-monitoring in nuclear plants, or gravitational-wave
+detection in astrophysics), are sensitive to delays, and would benefit from our approach.
+Locks may also result in known problems, such as deadlock, priority inversion,
+and lock convoying~\cite{F04}.
 
-An alternative approach is lock-free synchronization, a well-studied technique in concurrent 
-tree structures~\cite{EFRB10,EFHR14,FR2018,ABF+22} and other data structures~\cite{F04,HS08,FKR18}. 
-Lock-free algorithms eliminate the need for locks, ensuring that the system as a whole 
-always makes progress, regardless of thread delays or failures. This property is particularly 
-beneficial for highly parallel workloads, where blocking mechanisms can create bottlenecks. 
-%
-In this work, we introduce FreSh, a lock-free data series index that maintains the 
-correctness and strong performance of state-of-the-art lock-based indexes while avoiding 
-their synchronization overheads. Additionally, we present DFreSh, a dynamic version of 
-FreSh that extends its capabilities to support batches of updates while simultaneously 
-answering queries. This enables real-time index updates, making it well-suited for streaming
-data applications.
-%
-The relative performance of lock-free vs. lock-based approaches depends on the execution environment.
-When threads are pinned to distinct cores, algorithms with fine-grained locks perform well. 
-However, in oversubscribed settings (i.e., when there are more threads than available cores),
-lock-based solutions can suffer performance degradation, as threads holding locks may be
-de-scheduled, blocking others. Lock-free algorithms avoid such issues but can be more complex and,
-in some cases, may not always outperform lock-based approaches when delays and failures are absent.
+Lock-freedom~\cite{HS08} is a widely studied property when designing
+concurrent trees~\cite{EFRB10,EFHR14,FR2018,ABF+22} and other data structures~\cite{F04,HS08,FKR18}. 
+It avoids the use of locks, ensuring that the system, as a whole, 
+makes progress, independently of delays (or failures) of threads. 
+The relative performance of lock-free vs. lock-based algorithms depends on the setting:
+when threads are pinned to distinct cores, algorithms using fine-grained locks do well. However, in
+oversubscribed settings (more threads than cores), lock-based algorithms can suffer due to threads
+getting de-scheduled while holding a lock. Lock-free algorithms address these issues, but may be
+complicated and result in worse performance in settings with no delays/failures.
+Designing lock-free data series indexes, which exhibit good performance, is
+the focus of this thesis: we develop a lock-free data-series index, which always
+produces the correct output, while maintaining the good performance of state-of-the-art
+lock-based indexes.
 
 \noindent{\bf Challenges.} 
-Achieving lock-freedom in data series indexes often requires the use of a {\em helping} mechanism,
-where threads are made aware of the work other threads perform and can assist them when
-needed, such as during delays or load imbalances. However, conventional helping mechanisms
-tend to be costly and introduce significant overhead~\cite{F04,HS08,7515610,Williams2012CCI}.
-This is one of the reasons the vast majority of the software stack still relies on locks.
-Ensuring lock-freedom while maintaining the good performance of existing data series indexes 
-remains a significant challenge.
-%
-State-of-the-art data series indexes are designed to (a) maintain data locality
-and (b) minimize synchronization, aiming for high parallelism. 
-For example, they often partition the data into disjoint sets and assign a distinct thread to 
-handle each set's data~\cite{parisplus,PFP21-I,PFP21-II}.
-This design enables parallel and independent thread operations, reducing synchronization
-and communication costs. These goals are easier to achieve with locks or barriers
-~\cite{peng2018paris,peng2020messi,PFP21-I,PFP21-II}.
-%
-However, the way helping functions in conventional lock-free data structures is inherently
-incompatible with these principles. Implementing helping in such indexes without compromising
-these principles is a challenge.
-%
-Moreover, ensuring lock-freedom while maintaining load balancing and effective data pruning
-are additional hurdles. State-of-the-art data series indexes involve multiple processing phases,
-each using different data structures to optimize performance. Designing lock-based versions of
-these structures is feasible, but creating lock-free versions that adhere to the communication
-and synchronization principles of existing indexes is more difficult.
-%
-To develop a generalized approach for supporting lock-freedom in data series indexes systematically,
-we must first analyze the design decisions of existing state-of-the-art indexes and the performance
-principles they follow. We need to establish appropriate abstractions for the data series processing
-stages, as well as design principles that ensure efficiency. Achieving these goals introduces further
-challenges.
-%
-Lastly, a significant challenge in the context of dynamic updates, is transforming
-a static index, like FreSh, into a dynamic one that supports batch insertions of updates while 
-maintaining the same high performance. This dynamic index must ensure that queries continue to 
-return consistent and correct results, while also guaranteeing that each query retrieves all the 
-data seen by previous queries, including any updates made since the last query.
+To achieve lock-freedom, some form of helping is usually employed. 
+That is, appropriate mechanisms are provided to make threads aware 
+of the work that other threads perform, so that a thread may help others to
+complete their work whenever needed. 
+Unfortunately, conventional helping mechanisms are rather expensive and often
+introduce high overheads~\cite{F04,HS08,7515610,Williams2012CCI}.
+For this reason, the vast majority of the software stack is still based on locks. 
+Ensuring lock-freedom while maintaining the good performance of 
+existing data series indexes is a major challenge. 
+
+State-of-the-art indexes are designed to (a) maintain some form of {\em data locality},
+and (b) avoid synchronization as much as possible.
+For instance, they often separate the data into {\em disjoint sets}, and have a
+distinct thread manipulate the data of each set~\cite{parisplus,PFP21-I,PFP21-II}.
+This processing pattern enables threads to work in parallel and independently from each other,
+resulting in reduced synchronization and communication costs.  
+These principles for reduced communication and synchronization are easily achieved when locks 
+(or barriers) are utilized~\cite{peng2018paris,peng2020messi,PFP21-I,PFP21-II}.
+However, the way helping works in conventional lock-free data structures is inherently
+incompatible to these principles, thus making it challenging to implement helping on top
+of such indexes without sacrificing them. Providing lock-freedom while maintaining load-balancing
+among threads and ensuring good data pruning are further challenges to address. 
+
+State-of-the-art data series indexes encompass several data processing phases, 
+which often employ different data structures to accomplish their efficient processing. 
+Coming up with lock-free versions of these data structures, while respecting
+the communication and synchronization cost principles that govern existing 
+indexes, is another major challenge to address.
+
+In order to develop a generalized approach for supporting lock-freedom 
+on top of data series indexes in a {\em systematic way}, we need to study
+and understand the design decisions of state-of-the-art indexes and the performance
+principles that govern them. Then, we need appropriate abstractions for the data series
+processing stages and their properties, as well as a set of design principles that need
+to be respected for efficiency. Accomplishing these goals leads to additional challenges. 
+
+Existing indexes are designed primarily for static datasets, where all data is known in advance,
+and updates are not a primary concern. However, many modern applications require the ability to
+ingest new data continuously while ensuring that queries reflect the most recent updates.
+his introduces significant challenges. For example, one of the most important challenges is
+achieving efficient synchronization between threads that perform updates and threads that perform
+queries, which now run concurrently. This synchronization should be achieved without sacrificing
+the high performance of static indexes.
+
 
 \noindent
 {\bf Our approach.}
-We introduce FreSh, a novel static lock-free data series index, and DFreSh, 
-its dynamic counterpart that efficiently addresses all of the above challenges. 
-% 
+We introduce FreSh, a novel static lock-free data series index, and DFreSh, its dynamic
+counterpart (i.e., a version of FreSh that handles dynamic data). These algorithms address
+all the challenges mentioned above.
 Our experimental analysis demonstrate that FreSh matches the performance of 
 MESSI~\cite{PFP21-I}, the state-of-the-art concurrent data-series index, which is lock-based. 
 This confirms the efficiency of the helping mechanism we employ in FreSh. In many cases, 
@@ -121,105 +104,105 @@ FreSh even outperforms MESSI by allowing for higher parallelism during the const
 tree index.
 It's important to note that if threads crash, MESSI (and other lock-based approaches
 ~\cite{peng2018paris,PFP21-I,PFP21-II,hercules}) will not terminate, which is 
-why we did not provide experiments for this scenario. In contrast, 
-FreSh always terminates successfully and correctly.
-%
+why we did not include MESSI in the experiments for this scenario. In contrast, 
+FreSh always terminates successfully and correctly (even in the precessence of failures).
+
 To achieve FreSh, we developed ReFreSh, a generic approach that can be applied to a
 range of state-of-the-art blocking indexes to provide lock-freedom without 
 incurring additional costs. 
 %
-ReFreSh introduces the concept of locality-aware lock-freedom, which integrates
-key properties of data locality, high parallelism, low synchronization costs,
-and load balancing, qualities found in many existing parallel data series indexes.
-None of the conventional lock-free techniques we are aware of have been designed with
-these properties in mind, and our experiments show that using traditional lock-free
-techniques results in a significant performance drop (Graduate Thesis).
+ReFresh introduces the concept of {\em locality-aware lock-freedom} which encompasses
+the properties of data locality, high parallelism, low synchronization cost,
+and load balancing met in the designs of many existing parallel data series indexes.
+None of the conventional lock-free techniques we are aware of has been designed with
+the goal of respecting these properties. Indeed, our experiments show that such
+conventional techniques result in significantly lower performance.
+
+ReFresh respects the workload and data separation of the underlying data series index, 
+in order to not hurt the degrees of parallelism and load balancing of the index.
+Moreover, it provides a mechanism for threads to determine whether a specific part
+of a workload has been processed, and help only whenever necessary.
+Refresh introduces two modes of execution for each thread: 
+(i) {\em expeditive} and (ii) {\em standard}.
 %
-ReFreSh ensures that the underlying workload and data separation of the original data series
-index are preserved, thus not compromising parallelism or load balancing. It provides a mechanism
-for threads to determine whether a specific workload part has been processed, performing helping
-only when necessary. ReFreSh operates in two modes:
-\begin{itemize}
-    \item Expeditive mode with minimal synchronization costs, which avoids any helping.
-    \item Standard mode, where synchronization is necessary for helpin
-\end{itemize}
-%
-A thread initially processes its workload in expeditive mode, and helping is only performed
-after completing its assigned task. After that, threads synchronize to switch to standard mode.
-This approach ensures that synchronization and communication costs remain low, similar to the
-original index.
-%
-ReFreSh can be applied to any locality-aware algorithm (Chapter~\ref{chapter:Locality-aware}) to create its
-lock-free version. FreSh (Chapter~\ref{chapter:FreSh}) follows the design principles of locality-aware
-iSAX-based indexes~\cite{isaxfamily,PFP21-I}, but requires replacing the original index data structures
-with lock-free versions that support both expeditive and standard modes. We introduce lock-free
-implementations of several concurrent data structures, including binary trees and priority queues
-(Chapter~\ref{chapter:FreSh}), which provide enhanced parallelism compared to existing solutions.
-%
-We believe that these lock-free implementations and the ReFreSh framework can be applied to
-achieve high-performance lock-free versions of various big data processing systems.
-%
-To enable the systematic application of ReFreSh across all processing stages of an iSAX-based index,
-we introduce the abstraction of a traverse object (Chapter~\ref{chapter:traverse-object}). The traverse object
-is an abstract data type that offers a generic methodology for designing iSAX-based indexes modularly,
-abstracting the key operations involved in the index function. This allows us to provide a
-formal and flexible approach to designing iSAX-based indexes.
-Specifically, the iSAX-based index can be implemented as a sequence of operations on traverse objects. 
-%
-The novelties of this work go beyond the new techniques we introduce to design the
-lock-free index tree; in summary:
-\begin{itemize}
-\item Traverse-object abstraction: Provides a mechanism to apply the ReFreSh framework repeatedly to achieve lock-free data 
-    series indexes..
-\item ReFreSh framework: A generic approach that can be applied on top of any locality-aware blocking data structure to make it lock-free.
-\item FreSh design: first lock-free data series index.
-\item FreSh implementation: Introduces new lock-free tree and traverse-object implementations to achieve lock-freedom efficiently
-\item The first lock-free data series index supporting dynamic batch insertions of updates.
-\item Extends the FreSh implementation to support dynamic updates, addressing the challenge of maintaining lock-freedom during concurrent insertions..
-\end{itemize}
-The proposed lock-free tree incorporates several novel ideas that go beyond just engineering 
-improvements. Previous approaches required copying and locally updating a leaf node L upon insertion,
-followed by replacing it in the shared tree, which results in poor performance. We designed a novel
-algorithm for updating leaves that employs concurrent counters, announcements, handshaking, and
-other techniques to improve efficiency. The expeditive-standard mode transition also posed a
-challenge, as it requires synchronization when switching between modes.
+A thread executing in {\em standard} mode may incur synchronization overhead,
+as it needs to synchronize with helper threads; a thread executing in {expeditive}
+mode executes a code that avoids synchronization altogether. 
+A thread starts by processing its assigned workload in expeditive mode. 
+Helping is performed only after a thread has finished processing its own workload.
+Then, threads have to synchronize to execute on standard mode. 
+This way, \Refresh\ maintains the synchronization and communication costs as low as
+that of the underlying index.
+
+Refresh can be applied (Chapter~\ref{chapter:Locality-aware}) on top of any locality-aware
+algorithm to get a lock-free version of it. 
+\Fresh\ (Chapter~\ref{chapter:FreSh}) follows the design decisions of locality-aware
+iSAX-based indexes~\cite{isaxfamily,PFP21-I} (see Chapter~\ref{chapter:prelemenaries}).
+However, to develop \Fresh, we had to replace all data structures 
+of the original index~\cite{PFP21-I} with corresponding locality-aware lock-free versions;
+we present lock-free implementations of several concurrent data structures, such as  
+binary trees and priority queues (Chapter~\ref{chapter:FreSh}).
+The proposed lock-free tree contains several new ideas. 
+Previous solutions~\cite{EFRB10,DBLP:conf/podc/EllenFHR13,FR2018,NRM20} require that
+when a key is inserted in a leaf $\mathit{\ell}$, 
+$\mathit{\ell}$ is copied and updated locally, and then
+replaced in the shared tree. This results in bad performance. 
+Instead, we designed a novel algorithm for updating leaves, 
+which provides enhanced parallelism compared to existing algorithms.
+Another novelty, is the support of the new implementations for the expeditive and standard
+execution modes, which was a challenge by itself, as synchronization is
+needed to transfer from one mode to the other.
+We believe that these implementations, as well as \Refresh, could be employed to get
+highly-efficient lock-free versions of several other big data-processing solutions.
+
+To be able to apply ReFresh in a systematic way throughout all processing stages of an
+iSAX-based index, we introduce the abstraction of a {\em traverse object}
+(Chapter~\ref{chapter:traverse-object}). The traverse object is an abstract data type that
+leads to a generic methodology for designing an iSAX-based index in a modular way. It abstracts
+the main processing pattern used during the operation of iSAX-based indexes.
+Specifically, the iSAX-based index can be implemented via traverse object operations.
+The introduction of the traverse object is one of the novelties of our work.
+
+Many applications today require dynamicity, meaning that data arrives in a dynamic manner.
+To meet the needs of such applications, we develop a dynamic version of FreSh called DFreSh,
+where queries can be executed while data dynamically arrives in the index. We explore two dynamicity
+models inspired by different research domains and analyze their performance characteristics across
+various synthetic and real datasets.
+
 
 
 \noindent{\bf Contributions.} 
 Our contributions are summarized as follows.
 
-\noindent{$\bullet$  We develop a comprehensive theoretical framework for supporting lock-freedom 
-systematically in highly-efficient data series indexes. This includes introducing key concepts
-such as the traverse object, locality-awareness, and locality-aware lock-freedom, as well as
-identifying the desirable principles and properties for achieving optimal performance.
-This framework forms the basis for ReFreSh, a generic approach that can be applied to any 
-locality-aware data series algorithm to ensure lock-freedom
-} 
+\noindent{$\bullet$ We develop a theoretical framework 
+for supporting lock-freedom in a systematic way on top of highly-efficient data series indexes.
+In particular, we present \Refresh, a novel {\em generic approach} that can be applied on top of
+any locality-aware data series algorithm to ensure lock-freedom.} 
 
-\noindent{$\bullet$ Based on ReFreSh, we develop FreSh, the first lock-free, efficient data series
-index. We present new lock-free implementations of several data structures necessary to support the
-required functionality, demonstrating the feasibility and performance of a lock-free approach.}
+\noindent{$\bullet$ Based on \Refresh, we develop \Fresh, the first {\em lock-free},
+efficient iSAX-based data series index. To get \Fresh, we present new lock-free implementations
+of several data structures which support the needed functionality.}
 
-\noindent{$\bullet$ Building on the design of FreSh, we extend it to DFreSh, a lock-free data series
-index that supports dynamic batch insertions of updates. This is the first solution to maintain
-lock-freedom while allowing real-time updates, ensuring that queries always return consistent results,
-including data from previous updates}
+\noindent{$\bullet$ Our experiments, with large synthetic and real datasets, demonstrate 
+that \Fresh\ performs as good as the state-of-the-art {\em blocking} index,
+thus paying no penalty for providing lock-freedom (and in many cases achieves better performance). 
+}
 
-\noindent{$\bullet$ Our experiments, using large synthetic and real datasets, show that FreSh
-performs as well as the state-of-the-art blocking index, without sacrificing performance for
-lock-freedom. In many cases, it even outperforms existing solutions. Additionally, FreSh
-significantly outperforms several lock-free baselines, which rely on conventional lock-free techniques,
-due to its ability to preserve locality-awareness.}. 
+\noindent{$\bullet$ Experiments show that by providing lock-freedom without
+jeopardizing locality-awareness, \Fresh\ outperforms by far several lock-free
+baselines we have designed, based on conventional approaches for ensuring lock-freedom.
+}
 
-\noindent{$\bullet$ We introduce a theoretical framework using the traverse object, enabling the
-development of locality-aware data series indexes in a modular way. This framework allows for a
-systematic application of ReFreSh to transform locality-aware blocking algorithms into efficient
-lock-free versions.}
+\noindent{$\bullet$ We present a theoretical framework, which introduces the traverse object,
+and utilizes it to enable the development of locality-aware data series indexes in a modular way.
+}
 
-
-
-
-\noindent{$\bullet$ TODO: ADD DFreSh contributions.}
+\noindent{$\bullet$ Building on FreSh and incorporating ideas from both the database and
+concurrent computing domains, we designed and implemented two versions of DFreSh, each aligned
+with each of these fields. DFreSh is the first lock-free data series index that supports dynamic
+batch insertions while concurrently answering queries. It preserves the key innovations of FreSh
+and maintains high performance similar to FreSh, despite its dynamic nature.
+}
 
 \section{Other Related Work}
 Numerous tree-based techniques for efficient and scalable data series similarity search
@@ -235,11 +218,12 @@ DBLP:journals/pvldb/EchihabiZPB19, hercules, odyssey, dumpy}. These indexes also
 parallel and distributed solutions that leverage modern hardware (e.g., SIMD, multi-core,
 multi-socket, GPU), such as ParIS+~\cite{parisplus}, MESSI~\cite{PFP21-I}, and SING~\cite{PFP21-II},
 as well as distributed approaches like DPiSAX~\cite{dpisax, dpisaxjournal} and
-Odyssey~\cite{odyssey}.
-% 
+Odyssey~\cite{odyssey}. A summary of how a conventional iSAX based index work is provided in 
+Chapter~\ref{chapter:prelemenaries}.
+ 
 The first lock-free concurrent search tree implementation was proposed in~\cite{EFRB10}.
 Building on the ideas from that paper, we develop a baseline algorithm, which we discuss
-and compare experimentally with \textit{FreSh} in Section~\ref{chapter:Evaluation}.
+and compare experimentally with \textit{FreSh} in Chapter~\ref{chapter:Evaluation}.
 Several other non-blocking concurrent search trees have been introduced in the 
 literature~\cite{BER14, HL16, ABF20, HJ12, NRM20, CNT14, BP12, EFHR14, FR2018, ABF+22}.
 The key novelty of our tree implementation, presented in chapter~\ref{chapter:FreSh}, is its
@@ -249,22 +233,28 @@ of execution. These advancements result in improved parallelism and better perfo
 Our approach focuses solely on the functionality required for implementing traversal objects,
 whereas the aforementioned implementations support a variety of other features or are designed
 for different contexts.
-% 
+ 
 Concurrent priority queues have been explored in~\cite{AK15-I, RT21, WG15, SUNDELL2005609,
 tamir_et_al, LJ13}, none of which are based on sorted arrays or support different
 execution modes. In our baseline lock-free implementations, we use a skip-list-based
 priority queue~\cite{LJ13}, which has been shown to perform well. However, our experiments
 indicate that the priority queue design we implemented for \textit{FreSh} significantly
 outperforms this approach (Chapter~\ref{chapter:Evaluation}).
-% 
+ 
 Universal constructions~\cite{FK11spaa, FK12ppopp, FK14, FK17opodis, FK09, FK20,
 FKK18, EF+16, FKK22} can provide wait-free or non-blocking concurrent versions of any
 sequential data structure. However, due to their general nature, they are often less
 efficient than implementations tailored to specific data structures. The algorithms
 in~\cite{FK11spaa, FK14, FKK22} are highly efficient for small shared objects
 (e.g., stacks and queues) but are not suitable for our application.
-% 
+ 
 The concept of transforming algorithms to achieve different progress guarantees is not
 new, as seen in~\cite{SP14, ELM05, GKK06}, though these transformations address different
 problems. The technique used in \textit{FreSh}, called \textit{ReFreSh}  departs from all these
 prior approaches.
+
+The use of timestamps for handling dynamic data is common in data-based systems.
+For example, Apache Kafka and Google Spanner employ such mechanisms.
+The first approach we use for dynamicity is inspired by this timestamp model ~\cite{babcock2002}.
+Additionally, we introduce a second approach to designing a dynamic index that is linearizable \cite{herlihyWingLinearizability},
+ a widely used correctness condition in concurrent data structures.

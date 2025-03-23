@@ -206,7 +206,7 @@ Voutes University Campus, 700 13 Heraklion, Crete, Greece\\[0.5cm]
 \newcommand{\firstprof}{Panagiota Fatourou}
 \newcommand{\secondprof}{Themis Palpanas}
 \newcommand{\thirdprof}{Kostas Magoutis}
-\newcommand{\csdchair}{Kostas Magoutis}
+\newcommand{\csdchair}{Grigorios Tsagkatakis}
 
 \begin{titlepage}
 
@@ -300,7 +300,7 @@ in dynamic settings, which we call DFreSh. DFreSh handles batches of data that a
 in the system dynamically, making it a robust solution for real-time applications while
 retaining the performance benefits of FreSh. We follow two models of dynamicity coming
 from two research fields and study the performance properties of each of these settings
-using several synthetic and real datasets.
+using several synthetic and real datasets. 
 
 
 
@@ -395,7 +395,7 @@ using several synthetic and real datasets.
         \State \{Node,Leaf\} *$Tree$ :=  $\NULL$, initially pointing to a Leaf:
         \Statex \quad $\langle \mathit{key}, \NULL, \NULL, \langle \langle \bot, \bot \rangle, \ldots, \langle \bot, \bot \rangle \rangle,\False, \langle \bot, \ldots, \bot \rangle, \bot, 0 \rangle$
 
-        \Function{TreeInsert}{$\mathit{data}, \mathit{isHelper}, \mathit{mode}, \mathit{batchID}$}
+        \Function{TreeInsert}{$\mathit{data}, \mathit{isHelper}, \mathit{model}, \mathit{batchID}$}
             \State Leaf *$\mathit{leaf}$
             \State \{Node,Leaf\} *$\mathit{parent}$ := $Tree$, **$ptr$
             \State int $\mathit{pos}, \mathit{val}$
@@ -431,19 +431,19 @@ using several synthetic and real datasets.
                     \If{$\mathit{expeditive = \False}$}
                         \State $\mathit{leaf \rightarrow Announce[t].position} $ := $ \mathit{pos}$ \label{alg:tree:pos-in-D:update_dynamic}
                     \EndIf
-                    \If{\br{ $\mathit{Elements.GetIndex} \leq M$ \textbf{and} $\mathit{mode} = \mathit{LOGICAL}$}}
+                    \If{\br{ $\mathit{Elements.GetIndex} \leq M$ \textbf{and} $\mathit{model} = \mathit{Linearizable}$}}
                         \State \br{$\mathit{CAS(\&leaf \rightarrow D[pos].seq, \bot, MARKED)}$} \label{alg:tree:store-marked}
                     \EndIf
                     \State $\mathit{leaf \rightarrow D[pos]} $ := $ \mathit{data}$ \label{alg:tree:store-in-D_dynamic}
 
                     
-                    \If{\br{$\mathit{mode == LOGICAL}$}} \label{alg:tree:store-timestamp-start}
+                    \If{\br{$\mathit{model == Linearizable}$}} \label{alg:tree:store-timestamp-start}
                         \If{\br{$\mathit{leaf \rightarrow D[pos].seq == \bot }$}} \label{alg:tree:store-timestamp:opt}
                             \State \br{\Int\ currSeq := GlobalSeq}
                             \State \br{$\mathit{CAS(\&leaf \rightarrow D[pos].seq, \bot, currSeq)}$} \label{alg:tree:store-timestamp-CAS}
                         \EndIf
                     
-                    \ElsIf{\tl{$\mathit{mode == SYSTEM}$}}
+                    \ElsIf{\tl{$\mathit{model == Timestamps}$}}
                         \State \tl{$\mathit{leaf \rightarrow D[pos].seq} $ := $ \mathit{timeStamp[batchID]}$}
                     \EndIf \label{alg:tree:store-timestamp-end}
                 \Else
@@ -471,7 +471,7 @@ using several synthetic and real datasets.
 \begin{algorithm}[t]
     \footnotesize
     \begin{algorithmic}[1]
-        \Procedure{SplitLeaf}{$\mathit{leaf}$, $\mathit{prt}$, $\mathit{expeditive}$, $\mathit{mode}$}
+        \Procedure{SplitLeaf}{$\mathit{leaf}$, $\mathit{prt}$, $\mathit{expeditive}$, $\mathit{model}$}
             \State $\mathit{newNode} $ :=  \textbf{new} Node initialized with $\langle \bot, \NULL,
              \NULL, \langle \langle \bot, \bot \rangle, \ldots, \langle \bot, \bot \rangle \rangle, \textbf{not} \mathit{expeditive} \rangle$ \label{alg:tree:split:new-internal-node-dynamic}
             \State $\mathit{newNode \rightarrow left}$ := \textbf{new} Leaf initialized with 
@@ -486,7 +486,7 @@ using several synthetic and real datasets.
                         \State $\mathit{pos} $ := $ \mathit{leaf \rightarrow Announce[i].position}$
                         \State $\mathit{leaf \rightarrow D[\mathit{pos}].data} $ := $ \mathit{ldata}$ \label{alg:tree:announce-scan:store-in-D-dynamic}
                         
-                        \If{\br{$\mathit{mode == LOGICAL}$}}
+                        \If{\br{$\mathit{model == Linearizable}$}}
                             \If{\br{$\mathit{leaf \rightarrow D[\mathit{pos}].seq == MARKED}$}}
                                 \State \br{$\mathit{CAS(\&leaf \rightarrow D[\mathit{pos}].seq, MARKED, \bot)}$}
                             \Else
@@ -495,12 +495,12 @@ using several synthetic and real datasets.
                                     \State \br{$\mathit{CAS(\&leaf \rightarrow D[\mathit{pos}].seq, \bot,tmstamp )}$}
                                 \EndIf
                             \EndIf
-                        \ElsIf{\tl{$\mathit{mode == SYSTEM}$}}
+                        \ElsIf{\tl{$\mathit{model == Timestamps}$}}
                             \State \tl{$\mathit{tmstamp} $ := $ \mathit{timeStamp[batchID]}$}
                             \State \tl{$\mathit{leaf \rightarrow D[\mathit{pos}].seq} $ := $ \mathit{tmstamp}$}
                         \EndIf
                     \Else
-                        \If{\br{$\mathit{mode == LOGICAL}$}}
+                        \If{\br{$\mathit{model == Linearizable}$}}
                             \State \br{\textbf{Add} $(\mathit{ldata,\bot})$ \textbf{to} $\mathit{splitBuffer}$}
                         \Else
                             \State \tl{\textbf{Add} $(\mathit{ldata,timeStamp[batchID]})$ \textbf{to} $\mathit{splitBuffer}$}
@@ -512,7 +512,7 @@ using several synthetic and real datasets.
             
             \For{\textbf{each} element in $\mathit{leaf \rightarrow D[i]} \cup \mathit{splitBuffer}$}
                 \If{\bl{$\mathit{element.seq == \bot\ \And\ element \in D}$}}
-                    \If{\br{$\mathit{mode == LOGICAL}$}}
+                    \If{\br{$\mathit{model == Linearizable}$}}
                         \If{\br{$\mathit{leaf \rightarrow D[\mathit{pos}].seq == MARKED}$}}
                             \State \br{$\mathit{CAS(\&leaf \rightarrow D[\mathit{pos}].seq, MARKED, \bot)}$}
                         \Else
@@ -521,7 +521,7 @@ using several synthetic and real datasets.
                                 \State \br{$\mathit{CAS(\&leaf \rightarrow D[\mathit{pos}].seq, \bot,tmstamp )}$}
                             \EndIf
                         \EndIf
-                    \ElsIf{\tl{$\mathit{mode == SYSTEM}$}}
+                    \ElsIf{\tl{$\mathit{model == Timestamps}$}}
                         \State \tl{$\mathit{tmstamp} $ := $ \mathit{timeStamp[batchID]}$}
                         \State \tl{$\mathit{leaf \rightarrow D[\mathit{pos}].seq} $ := $ \mathit{tmstamp}$}
                     \EndIf
@@ -533,7 +533,7 @@ using several synthetic and real datasets.
             \State \textbf{Fix the key of} $\mathit{newNode}$ \Comment{may result in further leaf splits} \label{alg:tree:split-dynamic}
             \State $\CAS(*\mathit{ptr}, \mathit{leaf}, \mathit{newNode})$ \label{alg:tree:CAS-dynamic}
             
-            \If{\br{$\mathit{mode == LOGICAL}$}}
+            \If{\br{$\mathit{model == Linearizable}$}}
                 \State \br{\textbf{Traverse} $\mathit{ptr \rightarrow left}$ \textbf{and} $\mathit{ptr \rightarrow right}$ 
                 \Statex \br{\textbf{and for each element with} $\mathit{element.seq == \bot}$}}
                 \State \br{\hspace{1em} $\mathit{tmstamp} $ := $ \mathit{TIMESTAMP}$}
@@ -588,7 +588,7 @@ using several synthetic and real datasets.
             \If{$\mathit{pos} \geq \mathit{insPos}$}
                 \State \Return $\bot$
             \EndIf
-            \If{$\mathit{mode == LOGICAL}$}
+            \If{$\mathit{model == Linearizable}$}
                 \If{$\mathit{SA[pos].data.seq == MARKED}$}
                     \State \Return $\bot$
                 \EndIf            
@@ -600,14 +600,14 @@ using several synthetic and real datasets.
             \State \Return $\mathit{SA[pos].data}$
         \EndProcedure
     \end{algorithmic}
-    \caption{Priority queue of \Fresh with batches.}
+    \caption{Priority queue of \Fresh\ with batches.}
     \label{alg:pq-dynamic}
 \end{algorithm}
 
 As discussed in previous chapters, we designed and implemented an extension of FreSh,
 called \textit{DFreSh}, that supports insertions of dynamic batches while ensuring that
 queries always return the best possible answer and respect linearizability.
-In the pseudocode provided, we refer to this version as \textit{LOGICAL}.
+In the pseudocode provided, we refer to this version as \textit{Linearizable}.
 This approach is completely lock-free, meaning that neither index workers nor query workers
 need to wait for each other as long as they have available work. For example, index workers
 can continue inserting batches while query workers process queries concurrently.  
