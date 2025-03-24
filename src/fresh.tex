@@ -2,14 +2,11 @@
 \label{chapter:FreSh}
 
 We follow the data processing flow, described in Chapter~\ref{chapter:traverse-object},
-employ $\mathit{BC}$, $\mathit{TP}$, $\mathit{PS}$, and $\mathit{RS}$ (from Section~\ref{chapter:traverse-object}),
-and repeatedly apply \textit{ReFreSh} (from Section~\ref{chapter:Locality-aware}) to come up with \textit{FreSh},
-the first lock-free locality-aware data series index.
+employ $\mathit{BC}$, $\mathit{TP}$, $\mathit{PS}$, and $\mathit{RS}$,
+and repeatedly apply \textit{ReFreSh} (from Chapter~\ref{chapter:Locality-aware}) to come up with
+\textit{FreSh}, the first lock-free locality-aware data series index.
 
 \section{Counter Object}
-
-\rb{Not sure if we have to include this!!!! Found it on old versions}
-
 
 Many of our implementations use a {\em counter object}, which supports the
 operation \NextIndex\ (Algorithm~\ref{alg:counter}) which returns a positive integer. 

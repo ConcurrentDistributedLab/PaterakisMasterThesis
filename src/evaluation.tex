@@ -453,13 +453,13 @@ to dynamic thread environments, maintaining high performance levels.
         \hline
         \textbf{Algorithm Name} & \textbf{Abbreviation} \\ 
         \hline
-        Logical Timestamp with buffers & L TS BUF \\ 
+        Linearizable model with buffers & L TS BUF \\ 
         \hline
-    	System Timestamp with buffers & S TS BUF \\ 
+    	Timestamp model with buffers & S TS BUF \\ 
         \hline
-        Logical Timestamp without buffers & L TS NO BUF \\ 
+        Linearizable model without buffers & L TS NO BUF \\ 
         \hline
-        System Timestamp without buffers & S TS NO BUF \\ 
+        Timestamp model without buffers & S TS NO BUF \\ 
         \hline
     \end{tabular}
     \caption{Abbreviations of algorithms used in the experiments.}
@@ -568,8 +568,8 @@ batches, along with the query answering time of all queries up to the $i$-th que
 \noindent{\bf Dynamic FreSh vs FreSh.}
 We compare the dynamic version of \Fresh, referred to as DFreSh, with \Fresh, 
 the current state-of-the-art lock-free in-memory data series index. Our implementation 
-includes two versions of DFreSh, each employing a different timestamping algorithm: 
-Logical TS and System TS. Additionally, we implemented variations of both that directly 
+includes two versions of DFreSh, one that follows linearizability and one that uses
+timestamps reffered to as the Linearizable Model and Timestamp Model. Additionally, we implemented variations of both that directly 
 insert data into the iSAX tree, bypassing the summarization buffers used in 
 \Fresh\ during its first phase.
 Unlike DFreSh, which supports insertions of batches dynamically, \Fresh\ is a static
@@ -591,12 +591,12 @@ processing.
 Figure ~\ref{fig:dfresh-fresh-random} illustrates the overall performance of all 
 algorithms when building a 100GB index using random data. Specifically,
 figure ~\ref{fig:actual-index-Construction-time} compares the actual index construction times 
-of all algorithms, including \Fresh. As expected, the No Buffers version 
+of all algorithms, including \Fresh. As expected, the No buffers version 
 perform worse due to reduced cache locality caused by bypassing summarization buffers.
 Despite the overhead of managing dynamic updates (e.g such as handling timestamps), 
-the buffered versions (Logical and System TS) achieve performance comparable to \Fresh. 
+the buffered versions achieve performance comparable to \Fresh. 
 Figure ~\ref{fig:actual-query-answering-time} shows the 
-actual query answering time for all algorithms. The buffered versions ouperform No Buffers versions 
+actual query answering time for all algorithms. The buffered versions ouperform No buffers versions 
 because the same index worker operates on a subtree, meaning the cache lines of that worker 
 contatin data drom the same subtree leading to improved cache locality. In addition to that
 \Fresh\ avoids concurrent reads and writes, reducing cache misses.
@@ -613,7 +613,7 @@ during index construction, while the dark segment represents solo query answerin
 A dark segment indicates insufficient delay, causing some queries to run during
 the insertion of other batches.
 %
-%Once again, the No Buffers versions perform the worst, as cache misses are more costly when not 
+%Once again, the No buffers versions perform the worst, as cache misses are more costly when not 
 %all the data in  a cache line is useful. In contrast, the buffered versions perform better because 
 %the same index worker operates on a subtree, meaning the cache lines of that worker 
 %contain data from the same subtree, leading to improved cache locality.
@@ -724,10 +724,10 @@ index size.
 %
 For example, in Figure~\ref{fig:progress-queries-2-logical}, the first bar shows
 that 50 queries were answered between the initial index state and the insertion of
-the first batch. This indicates that the implementation of DFreSh using logical timestamps
+the first batch. This indicates that the implementation of DFreSh following the linearizable model
 processes all queries associated with that batch before the next insertion. In contrast,
 Figure~\ref{fig:progress-queries-2-system-no-buffers} shows that the implementation
-without summarization buffers and using system timestamps answers only 31 out of 50
+without summarization buffers and following the Timestamp model answers only 31 out of 50
 queries in the same timeframe.
 %
 These graphs also provide insights into the overall query answering performance, as
@@ -741,22 +741,22 @@ the available time.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/2/average_query_time_per_batch_version_999777015_10485760_10_delay[2].png}
-		\caption{Logical TS buffers}
+		\caption{Linearizable model with buffers}
 		\label{fig:progress-queries-2-logical}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/2/average_query_time_per_batch_version_999777018_10485760_10_delay[2].png}
-		\caption{System TS buffers}
+		\caption{Timestamp model with buffers}
 		\label{fig:progress-queries-2-system}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/2/average_query_time_per_batch_version_999777016_10485760_10_delay[2].png}
-		\caption{Logical TS No buffers}
+		\caption{Linearizable model without buffers}
 		\label{fig:progress-queries-2-logical-no-buffers}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/2/average_query_time_per_batch_version_999777017_10485760_10_delay[2].png}
-		\caption{System TS No buffers}
+		\caption{Timestamp model without buffers}
 		\label{fig:progress-queries-2-system-no-buffers}
 	\end{subfigure}
 	\caption{Query progress with minimum delay 2 sec.}
@@ -768,22 +768,22 @@ the available time.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/3/average_query_time_per_batch_version_999777015_10485760_10_delay[3].png}
-		\caption{Logical TS buffers}
+		\caption{Linearizable model with buffers}
 		\label{fig:progress-queries-3-logical}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/3/average_query_time_per_batch_version_999777018_10485760_10_delay[3].png}
-		\caption{System TS buffers}
+		\caption{Timestamp model with buffers}
 		\label{fig:progress-queries-3-system}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/3/average_query_time_per_batch_version_999777016_10485760_10_delay[3].png}
-		\caption{Logical TS No buffers}
+		\caption{Linearizable model without buffers}
 		\label{fig:progress-queries-3-logical-no-buffers}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/3/average_query_time_per_batch_version_999777017_10485760_10_delay[3].png}
-		\caption{System TS No buffers}
+		\caption{Timestamp model without buffers}
 		\label{fig:progress-queries-3-system-no-buffers}
 	\end{subfigure}
 	\caption{Query progress with Intermediate delay 3 sec.}
@@ -796,22 +796,22 @@ the available time.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/5/average_query_time_per_batch_version_999777015_10485760_10_delay[5].png}
-		\caption{Progress of Queries Logical TS buffers}
+		\caption{Linearizable model with buffers}
 		\label{fig:progress-queries-5-logical}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/5/average_query_time_per_batch_version_999777018_10485760_10_delay[5].png}
-		\caption{Progress of Queries System TS buffers}
+		\caption{Timestamp model with buffers}
 		\label{fig:progress-queries-5-system}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/5/average_query_time_per_batch_version_999777016_10485760_10_delay[5].png}
-		\caption{Progress of Queries Logical TS No buffers}
+		\caption{Linearizable model without buffers}
 		\label{fig:progress-queries-5-logical-no-buffers}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/5/average_query_time_per_batch_version_999777017_10485760_10_delay[5].png}
-		\caption{Progress of Queries System TS No buffers}
+		\caption{Timestamp model without buffers}
 		\label{fig:progress-queries-5-system-no-buffers}
 	\end{subfigure}
 	\caption{Query progress with Intermediate delay 5 sec.}
@@ -824,22 +824,22 @@ the available time.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/7/average_query_time_per_batch_version_999777015_10485760_10_delay[7].png}
-		\caption{Progress of Queries Logical TS buffers}
+		\caption{Linearizable model with buffers}
 		\label{fig:progress-queries-7-logical}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/7/average_query_time_per_batch_version_999777018_10485760_10_delay[7].png}
-		\caption{Progress of Queries System TS buffers}
+		\caption{Timestamp model with buffers}
 		\label{fig:progress-queries-7-system}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/7/average_query_time_per_batch_version_999777016_10485760_10_delay[7].png}
-		\caption{Progress of Queries Logical TS No buffers}
+		\caption{Linearizable model without buffers}
 		\label{fig:progress-queries-7-logical-no-buffers}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/Progress/7/average_query_time_per_batch_version_999777017_10485760_10_delay[7].png}
-		\caption{Progress of Queries System TS No buffers}
+		\caption{Timestamp model without buffers}
 		\label{fig:progress-queries-7-system-no-buffers}
 	\end{subfigure}
 	\caption{Query progress with largest delay, 7 sec.}
@@ -852,14 +852,14 @@ the available time.
 
 Figure \ref{fig:latency-random} presents the average latency for each query. 
 
-In Figure \ref{fig:latency-random}, System TS Buffers and FreSh exhibit similar latency. 
-The key difference between these two implementations, aside from the fact that System TS Buffers 
-support dynamic updates, is that System TS Buffers allow concurrent query execution with timestamps 
+In Figure \ref{fig:latency-random}, Timestamp model and FreSh exhibit similar latency. 
+The key difference between these two implementations, aside from the fact that Timestamp model with buffers 
+support dynamic updates, is that it allows concurrent query execution with timestamps 
 earlier than the timestamp of the inserting batch. In our implementation, each query receives 
 an incrementing timestamp, meaning that the timestamp of query $i+1$ will be larger than that 
 of query $i$. As a result, only a small portion of the queries will be fast enough to be answered
 before the update batch acquires a timestamp. After this point, queries must wait for the index to 
-be completed before they can proceed. In the worst-case scenario for System TS Buffers, queries 
+be completed before they can proceed. In the worst-case scenario for Timestamp model with buffers, queries 
 are never fast enough to be answered before the new batch acquires a timestamp, causing it to 
 behave similarly to FreSh.
 
@@ -964,8 +964,8 @@ Figure~\ref{fig:dfresh-performance-astro} presents the overall performance
 of DFreSh. Specifically, Figure~\ref{fig:actual-index-Construction-time-astro}
 shows the index construction time, where, as expected, versions utilizing
 summarization buffers achieve better performance. We observe that
-\textit{System Timestamps} outperform \textit{Logical Timestamps}. 
-This is expected, as system timestamps eliminate the need for CAS instructions
+\textit{Timestamp model} outperform \textit{Linearizable model}. 
+This is expected, as Timestamp model eliminate the need for CAS instructions
 during timestamp assignment and reduce concurrency in the iSAX tree between
 workers handling different phases due to the waiting protocol we described,
 which in turn leads to fewer cache misses. 
@@ -1017,19 +1017,19 @@ bar represents are explained in the same experiment conducted on the random data
 A few observations can be made from these graphs. As expected, as the delay increases,
 all versions of DFreSh continue to answer queries in a timely manner. However, in
 Figures~\ref{fig:logical-ts-50-astro} to~\ref{fig:system-ts-50-astro}, a different
-pattern emerges between the \textit{Logical} and \textit{System} timestamps. Although
-\textit{System} timestamps appear fast enough to answer queries promptly in the early
-stages, they end up perform worse than \textit{Logical}.
+pattern emerges between the \textit{Linearizable} and \textit{Timestamp} model. Although
+\textit{Timestamp} model appear fast enough to answer queries promptly in the early
+stages, they end up perform worse than \textit{Linearizable} model.
 %
 From these graphs, we observe that when the index is around half its full capacity,
 the average query answering time reaches its peak. This is likely because the queries
 being answered during this period are the most difficult or the queries cause contention
-and thus cache misses. Since \textit{Logical} timestamps support more concurrency
+and thus cache misses. Since \textit{Linearizable} model support more concurrency
 between workers, they face greater contention, resulting in fewer queries being
 answered in that phase. For instance, between the $40$-$60$GB range, the
-\textit{System} version answers $89$ queries in total, while the \textit{Logical}
-version answers only $80$. However, in the next range ($70$-$80$GB), \textit{Logical}
-timestamps manage to close the $9$-query gap, answering queries in a smaller
+\textit{Timestamp} model answers $89$ queries in total, while the \textit{Linearizable}
+model answers only $80$. However, in the next range ($70$-$80$GB), \textit{Linearizable}
+model manage to close the $9$-query gap, answering queries in a smaller
 average time.
 
 
@@ -1037,22 +1037,22 @@ average time.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/ASTRO/Batch_processing/50/average_query_time_per_batch_version_999777015_10485760_10_delay[50].png}
-		\caption{Astro: Logical TS Buffers}
+		\caption{Astro: Linearizable model with buffers}
 		\label{fig:logical-ts-50-astro}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/50/average_query_time_per_batch_version_999777018_10485760_10_delay[50].png}
-		\caption{Astro: System TS Buffers}
+		\caption{Astro: Timestamp model with buffers}
 		\label{fig:system-ts-50-astro}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/50/average_query_time_per_batch_version_999777016_10485760_10_delay[50].png}
-		\caption{Astro: Logical TS No Buffers}
+		\caption{Astro: Linearizable model without buffers}
 		\label{fig:logical-ts-no-50-astro}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/50/average_query_time_per_batch_version_999777017_10485760_10_delay[50].png}
-		\caption{Astro: System TS No Buffers}
+		\caption{Astro: Timestamp model without buffers}
 		\label{fig:system-ts-no-50-astro}
 	\end{subfigure}
 	\caption{Astro: Query Progress 50 delay - 100GB/450Q}
@@ -1063,22 +1063,22 @@ average time.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/ASTRO/Batch_processing/60/average_query_time_per_batch_version_999777015_10485760_10_delay[60].png}
-		\caption{Astro: Logical TS Buffers}
+		\caption{Astro: Linearizable model with buffers}
 		\label{fig:logical-ts-60-astro}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/60/average_query_time_per_batch_version_999777018_10485760_10_delay[60].png}
-		\caption{Astro: System TS Buffers}
+		\caption{Astro: Timestamp model with buffers}
 		\label{fig:system-ts-60-astro}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/60/average_query_time_per_batch_version_999777016_10485760_10_delay[60].png}
-		\caption{Astro: Logical TS No Buffers}
+		\caption{Astro: Linearizable model without buffers}
 		\label{fig:logical-ts-no-60-astro}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/60/average_query_time_per_batch_version_999777017_10485760_10_delay[60].png}
-		\caption{Astro: System TS No Buffers}
+		\caption{Astro: Timestamp model without buffers}
 		\label{fig:system-ts-no-60-astro}
 	\end{subfigure}
 	\caption{Astro: Query Progress 60 delay - 100GB/450Q}
@@ -1089,22 +1089,22 @@ average time.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/ASTRO/Batch_processing/70/average_query_time_per_batch_version_999777015_10485760_10_delay[70].png}
-		\caption{Astro: Logical TS Buffers}
+		\caption{Astro: Linearizable model with buffers}
 		\label{fig:logical-ts-70-astro}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/70/average_query_time_per_batch_version_999777018_10485760_10_delay[70].png}
-		\caption{Astro: System TS Buffers}
+		\caption{Astro: Timestamp model with buffers}
 		\label{fig:system-ts-70-astro}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/70/average_query_time_per_batch_version_999777016_10485760_10_delay[70].png}
-		\caption{Astro: Logical TS No Buffers}
+		\caption{Astro: Linearizable model without buffers}
 		\label{fig:logical-ts-no-70-astro}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/ASTRO/Batch_processing/70/average_query_time_per_batch_version_999777017_10485760_10_delay[70].png}
-		\caption{Astro: System TS No Buffers}
+		\caption{Astro: Timestamp model without buffers}
 		\label{fig:system-ts-no-70-astro}
 	\end{subfigure}
 	\caption{Astro: Query Progress 70 delay - 100GB/450Q}
@@ -1205,22 +1205,22 @@ with patterns aligning well with our observations from earlier experiments.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/25/average_query_time_per_batch_version_999777015_10485760_10_delay[25].png}
-		\caption{Seismic: Logical TS Buffers}
+		\caption{Seismic: Linearizable model with buffers}
 		\label{fig:logical-ts-25-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/25/average_query_time_per_batch_version_999777018_10485760_10_delay[25].png}
-		\caption{Seismic: System TS Buffers}
+		\caption{Seismic: Timestamp model with buffers}
 		\label{fig:system-ts-25-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/25/average_query_time_per_batch_version_999777016_10485760_10_delay[25].png}
-		\caption{Seismic: Logical TS No Buffers}
+		\caption{Seismic: Linearizable model without buffers}
 		\label{fig:logical-ts-no-25-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/25/average_query_time_per_batch_version_999777017_10485760_10_delay[25].png}
-		\caption{Seismic: System TS No Buffers}
+		\caption{Seismic: Timestamp model without buffers}
 		\label{fig:system-ts-no-25-seismic}
 	\end{subfigure}
 	\caption{Seismic: Query Progress 25 delay - 90GB/400Q}
@@ -1231,22 +1231,22 @@ with patterns aligning well with our observations from earlier experiments.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/35/average_query_time_per_batch_version_999777015_10485760_10_delay[35].png}
-		\caption{Seismic: Logical TS Buffers}
+		\caption{Seismic: Linearizable model with buffers}
 		\label{fig:logical-ts-35-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/35/average_query_time_per_batch_version_999777018_10485760_10_delay[35].png}
-		\caption{Seismic: System TS Buffers}
+		\caption{Seismic: Timestamp model with buffers}
 		\label{fig:system-ts-35-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/35/average_query_time_per_batch_version_999777016_10485760_10_delay[35].png}
-		\caption{Seismic: Logical TS No Buffers}
+		\caption{Seismic: Linearizable model without buffers}
 		\label{fig:logical-ts-no-35-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/35/average_query_time_per_batch_version_999777017_10485760_10_delay[35].png}
-		\caption{Seismic: System TS No Buffers}
+		\caption{Seismic: Timestamp model without buffers}
 		\label{fig:system-ts-no-35-seismic}
 	\end{subfigure}
 	\caption{Seismic: Query Progress 35 delay - 90GB/400Q}
@@ -1257,22 +1257,22 @@ with patterns aligning well with our observations from earlier experiments.
 	\centering
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]   {figures/Experiments/Dynamic/SEISMIC/50/average_query_time_per_batch_version_999777015_10485760_10_delay[50].png}
-		\caption{Seismic: Logical TS Buffers}
+		\caption{Seismic: Linearizable model with buffers}
 		\label{fig:logical-ts-50-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/50/average_query_time_per_batch_version_999777018_10485760_10_delay[50].png}
-		\caption{Seismic: System TS Buffers}
+		\caption{Seismic: Timestamp model with buffers}
 		\label{fig:system-ts-50-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/50/average_query_time_per_batch_version_999777016_10485760_10_delay[50].png}
-		\caption{Seismic: Logical TS No Buffers}
+		\caption{Seismic: Linearizable model without buffers}
 		\label{fig:logical-ts-no-50-seismic}
 	\end{subfigure}
 	\begin{subfigure}[c]{0.48\textwidth}
 		\includegraphics[width=1\textwidth]	 {figures/Experiments/Dynamic/SEISMIC/50/average_query_time_per_batch_version_999777017_10485760_10_delay[50].png}
-		\caption{Seismic: System TS No Buffers}
+		\caption{Seismic: Timestamp model without buffers}
 		\label{fig:system-ts-no-50-seismic}
 	\end{subfigure}
 	\caption{Seismic: Query Progress 50 delay - 90GB/400Q}
