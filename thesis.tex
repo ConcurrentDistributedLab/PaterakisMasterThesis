@@ -716,7 +716,7 @@ its results, violating correctness.
 
 To prevent this issue, we introduce a marking technique. Before storing data into 
 the leaf, a thread first checks whether a split is in progress by reading the value
-of \textit{NextIndex}. If a split is occurring, the thread marks its position
+of the counter that is increased using the \textit{NextIndex}. If a split is occurring, the thread marks its position
 by setting the sequence number to \textit{MARKED} using a CAS operation before
 inserting the data. A query encountering a \textit{MARKED} position treats it as 
 invalid. During the split operation, all marked positions are reset to \( \bot \), 
