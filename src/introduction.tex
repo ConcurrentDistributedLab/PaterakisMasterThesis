@@ -86,7 +86,7 @@ to be respected for efficiency. Accomplishing these goals leads to additional ch
 Existing indexes are designed primarily for static datasets, where all data is known in advance,
 and updates are not a primary concern. However, many modern applications require the ability to
 ingest new data continuously while ensuring that queries reflect the most recent updates.
-his introduces significant challenges. For example, one of the most important challenges is
+This introduces significant challenges. For example, one of the most important challenges is
 achieving efficient synchronization between threads that perform updates and threads that perform
 queries, which now run concurrently. This synchronization should be achieved without sacrificing
 the high performance of static indexes.

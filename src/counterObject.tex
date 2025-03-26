@@ -1,0 +1,97 @@
+\section{Counter Object}
+\label{sec:counter-object}
+
+Let \NextIndex\ be invoked $K$ times.
+If crashes do not occur, every index in the range $R = 
+\{0, \ldots, K-1\}$ should be returned exactly once 
+be each of the $K$ invocations of \NextIndex\.
+Otherwise, as many indexes from $R$, as the number of crashed threads, 
+are not returned, whereas the rest are returned exactly once.
+
+Algorithm~\ref{alg:counter} uses two counters. The first, $\mathit{cntEM}$,
+is used in the expeditive mode and is updated by simple writes
+(line~\ref{alg:co:em:inc-elements}),
+whereas the second, $\mathit{cntSM}$, is used in the standard mode and
+is updated using \FAI\ (line~\ref{alg:co:FAI-pos}).
+As long as no helpers exist ($\mathit{h = \False}$), the owner thread $t$ executes 
+a code similar to the sequential code implementing a counter (lines~\ref{alg:co:em:acquire-pos}-
+\ref{alg:co:em:checkh1}). When a helper arrives, it sets $\mathit{cntSM}$ to the current
+value of $cntEM$ (lines~\ref{alg:co:em:ownerFlag}, \ref{alg:co:em:cntSM-init}),
+and uses \FAI\ on $\mathit{cntSM}$ (line~\ref{alg:co:FAI-pos}) to get assigned new indexes. 
+
+Lines~\ref{alg:co:em:elements-bot}-\ref{alg:co:FAI-pos} provide a mechanism for appropriately
+synchronizing $t$ with the helper threads when they arrive. Assume that $t$ has read the
+value $x$ in $\mathit{cntEM}$, and it is ready to write $x+1$ in $\mathit{cntEM}$,
+when two helper threads $t_h$ and $t'_h$ arrive.
+Thread $t_h$ reads $x$ in $\mathit{cntEM}$, then $t$ writes $x+1$ 
+in $\mathit{cntEM}$ and $t'_h$ reads  $x+1$ in $\mathit{cntEM}$.
+Depending on which of the two values will be written in $\mathit{cntSM}$
+and the order in which the \FAI\ instructions will be executed, 
+one of $t_h$, $t'_h$ may read $x$ in $\mathit{cntSM}$ and return it.
+% 
+In this case, $t$ should avoid returning $x$ a second time (to ensure the semantics of
+a counter object). To achieve this, helpers record in $\mathit{first}$ the value with
+which they initialize $\mathit{cntSM}$. 
+% 
+If $t$ discovers that helpers exist (lines~\ref{alg:co:em:checkh1},~\ref{alg:co:em:ownerFlag}), 
+%is the thread to successfully execute the \CAS\ of line~\ref{27}, it stores
+%the value $x+1$ there, so helper threads will return this or higher values. 
+%In this case, it is safe for $t$ to return $x$ (line~\ref{28}).
+%Otherwise, $t$ 
+it may have to read $\mathit{first}$ to figure out which is the first value recorded
+in $\mathit{cntSM}$. If it is $x$, it  retries
+(line~\ref{alg:co:em:continue2}). Note that helpers should first agree on the value 
+to record in $\mathit{cntSM}$ with the \CAS\ of line~\ref{alg:co:em:casfirst} and then all 
+use this value to initialize $\mathit{cntSM}$ (lines~\ref{alg:co:em:pos2}-~\ref{alg:co:em:cntSM-init}).
+
+
+\begin{algorithm}[t]
+    \footnotesize
+    \caption{Pseudocode for \NextIndex.}
+    \label{alg:counter}
+    \begin{algorithmic}[1]
+
+        \State \textbf{Shared variables:}
+        \State int $\mathit{cntEM}$ (initially $0$), $\mathit{cntSM}$ (initially $\bot$)
+
+        \vspace{2mm}
+
+        \Function{NextIndex}{$\mathit{boolean *h}$} \textbf{returns} $\langle \mathit{int, \Boolean} \rangle$
+            \State int $\mathit{pos}$
+            \State int $\mathit{ownerFlag} \gets \False$
+            
+            \While{\True}
+                \If{$\mathit{*h = \False}$} \label{alg:co:em}
+                    \State $\mathit{pos} \gets \mathit{cntEM}$ \label{alg:co:em:acquire-pos}
+                    \If{$\mathit{*h == \True}$} 
+                        \State \textbf{continue} \label{alg:co:em:continue1}
+                    \EndIf
+                    \State $\mathit{cntEM} \gets \mathit{cntEM}+1$ \label{alg:co:em:inc-elements}
+                    \If{$\mathit{*h == \False}$} 
+                        \State \Return $\langle pos, \True \rangle$ \label{alg:co:em:checkh1}
+                    \EndIf
+                    \State $\mathit{ownerFlag} \gets \True$ \label{alg:co:em:ownerFlag}
+                \EndIf
+
+                \If{$\mathit{cntSM = \bot}$} \label{alg:co:em:elements-bot}
+                    \If{$\mathit{ownerFlag \neq \True}$} \label{alg:co:em:ifHelper}
+                        \State $\mathit{pos} \gets \mathit{cntEM}$ \label{alg:co:em:ownerFlag1}
+                        \State $\mathit{\CAS(first, \bot, pos)}$ \label{alg:co:em:casfirst}
+                        \State $\mathit{pos} \gets first$ \label{alg:co:em:pos2}
+                    \EndIf
+                    \State $\mathit{v} \gets \CAS(cntSM, \bot, pos)$ \label{alg:co:em:cntSM-init}
+                    \If{$\mathit{v == \bot}$ \textbf{and} $\mathit{ownerFlag = \True}$}
+                        \State \Return $\langle pos, \False \rangle$ \label{alg:co:em:ifOwner}
+                    \ElsIf{$\mathit{first < cntEM}$} 
+                        \State \textbf{continue} \label{alg:co:em:continue2}
+                    \EndIf
+                \EndIf
+
+                \State $\mathit{pos} \gets \FAI(\mathit{cntSM})$ \label{alg:co:FAI-pos}
+                \State \Return $\langle pos, \False \rangle$ \label{alg:co:em:return}
+            \EndWhile
+
+        \EndFunction
+
+    \end{algorithmic}
+\end{algorithm}

@@ -481,9 +481,9 @@ using several synthetic and real datasets.
             
             \If{$\mathit{expeditive = \False}$} \label{alg:tree:em:Announce-scan-dynamic}
                 \For{$i \in \{0, \ldots, n-1\}$ \textbf{with} $\mathit{leaf \rightarrow Announce[i].data} \neq \bot$} \label{alg:tree:Announce-scan-dynamic}
-                    \State $\mathit{ldata} $ := $ \mathit{leaf \rightarrow Announce[i].data}$
+                    \State $\mathit{ldata} $ := $ \mathit{leaf \rightarrow Announce[i].data}$ \label{alg:tree:announce-scan:D-data}
                     \If{$\mathit{leaf \rightarrow Announce[i].position} \neq \bot$} \label{alg:tree:announce-scan:pos-not-bot-dynamic}
-                        \State $\mathit{pos} $ := $ \mathit{leaf \rightarrow Announce[i].position}$
+                        \State $\mathit{pos} $ := $ \mathit{leaf \rightarrow Announce[i].position}$ \label{alg:tree:announce-scan:D-position}
                         \State $\mathit{leaf \rightarrow D[\mathit{pos}].data} $ := $ \mathit{ldata}$ \label{alg:tree:announce-scan:store-in-D-dynamic}
                         
                         \If{\br{$\mathit{model == Linearizable}$}}
@@ -499,8 +499,8 @@ using several synthetic and real datasets.
                             \State \tl{$\mathit{tmstamp} $ := $ \mathit{timeStamp[batchID]}$}
                             \State \tl{$\mathit{leaf \rightarrow D[\mathit{pos}].seq} $ := $ \mathit{tmstamp}$}
                         \EndIf
-                    \Else
-                        \If{\br{$\mathit{model == Linearizable}$}}
+                    \Else \label{alg:tree:add-splitbuffer-D}
+                        \If{\br{$\mathit{model == Linearizable}$}} 
                             \State \br{\textbf{Add} $(\mathit{ldata,\bot})$ \textbf{to} $\mathit{splitBuffer}$}
                         \Else
                             \State \tl{\textbf{Add} $(\mathit{ldata,timeStamp[batchID]})$ \textbf{to} $\mathit{splitBuffer}$}
@@ -511,7 +511,7 @@ using several synthetic and real datasets.
             \EndIf \label{alg:tree-split-set-timestamp-start}
             
             \For{\textbf{each} element in $\mathit{leaf \rightarrow D[i]} \cup \mathit{splitBuffer}$}
-                \If{\bl{$\mathit{element.seq == \bot\ \And\ element \in D}$}}
+                \If{\bl{$\mathit{element.seq == \bot\ \And\ element \in D}$}} \label{alg:split-dynamic-belong-D-start}
                     \If{\br{$\mathit{model == Linearizable}$}}
                         \If{\br{$\mathit{leaf \rightarrow D[\mathit{pos}].seq == MARKED}$}}
                             \State \br{$\mathit{CAS(\&leaf \rightarrow D[\mathit{pos}].seq, MARKED, \bot)}$}
@@ -525,7 +525,7 @@ using several synthetic and real datasets.
                         \State \tl{$\mathit{tmstamp} $ := $ \mathit{timeStamp[batchID]}$}
                         \State \tl{$\mathit{leaf \rightarrow D[\mathit{pos}].seq} $ := $ \mathit{tmstamp}$}
                     \EndIf
-                \EndIf
+                \EndIf \label{alg:split-dynamic-belong-D-end}
                 \State \textbf{Distribute} the element into $\mathit{newNode \rightarrow left}$ \textbf{or} $\mathit{newNode \rightarrow right}$
                 \Statex   \textbf{based on its key}
             \EndFor \label{alg:tree-split-set-timestamp-end}
@@ -623,54 +623,70 @@ need to wait for each other as long as they have available work.
  
 To ensure correctness and syncronize index construction and query answering workers
 this model uses sequence numbers. 
-Specifically, we maintain a global shared counter, \textit{GlobalSeq}, which is accessible to both
-index and query workers. Query workers are responsible to increment the value of \textit{GlobalSeq} 
-by one before answering a query. A query must be able to see all data series inserted
-into the index with a sequence smaller than or equal to its own before it is answered.  
+Specifically, we maintain a global shared counter, \textit{GlobalSeq}, which is accessible to
+both index and query workers. This counter serves as the sequence number,
+representing either a data series or a query, depending on whether its value has been read
+by index or query workers.
+Before answering a query, query workers attempt to atomically increment the value
+of \textit{GlobalSeq} by one.
+The index workers also read the \textit{GlobalSeq} during each insert and assign 
+a sequence number to the data series they insert in the tree index.
+A query must be able to see all data series inserted
+into the index tree with a sequence number smaller than or equal to its own.
 
+\noindent{\textbf{Tree Insertion.}}
 The insertion process for index workers follows the same general approach as in FreSh,
 using the \texttt{TreeInsert} method (see Algorithm~\ref{alg:tree:dynamic}). However,
 the iSAX tree structure in this dynamic setting differs from that of FreSh.
-Each leaf node now contains an array \( D \), where each element consists of
-a sequence number, an iSAX summary, and a pointer to the original data series stored in
-\texttt{RawData}. Despite these differences, the core insertion procedure remains
-similar to what was described in Chapter~\ref{chapter:FreSh}.  
+The elements of array \( D \) contained in each leaf now store 
+the sequece number of each data series in addition 
+to the iSAX summary and the pointer to the actual data series. 
+Despite these differences, the core insertion procedure remains
+similar to what was described in Algorithm~\ref{alg:tree}.  
 An index worker first locates the appropriate leaf to insert a new element
 (line~\ref{alg:tree:search:dynamic}). It then attempts to acquire a position in the leaf
 node. If space is available (line~\ref{alg:tree:pos-in-D_dynamic}), the data series is
-stored as before. However, for an element to be considered valid, it must first be assigned
+stored as described in Section~\ref{sec:buffers_and_tree}. However, for an element to be considered valid, it must first be assigned
 a sequence number, which is done using a Compare-And-Swap (CAS) operation
 (line~\ref{alg:tree:store-timestamp-CAS}).  
+
 Since queries are processed concurrently with insertions, a query worker may
 encounter elements in a candidate leaf during the \textit{Refinement} stage. For each
 element in the leaf, the query worker first checks its sequence number. If the sequence
 number is smaller than or equal to the query's timestamp, the element must be considered
 in the query result. If it has a larger value, the query worker skips it. However, if the
 sequence number is unassigned (denoted by \( \bot \)), the query worker cannot ignore
-the element and must help assign a sequence number using a CAS operation
-(line~\ref{alg:pq:CAS:Dynamic}). Since both index and query workers can assign sequence
-numbers, the CAS operation ensures correctness while the preceding conditional
-check optimizes performance by avoiding unnecessary failed CAS attempts.
+the element and must help assign a sequence number using a CAS operation 
+(Algorithm~\ref{alg:pq-dynamic} line~\ref{alg:pq:CAS:Dynamic}). Since both index and query
+workers can assign sequence numbers, the CAS operation ensures correctness while the
+preceding conditional check optimizes performance by avoiding unnecessary
+failed CAS attempts.
 
-On the other hand, if the leaf is full, the index worker attempts to perform a split.  
-During the split operation, the index worker first examines the announce array
+\noindent{\textbf{Split Operation.}}
+If the leaf is full, the index worker attempts to perform a split.  
+During the split operation (Algorithm~\ref{alg:tree-split-dynamic}), the index worker
+first examines the announce array (line~\ref{alg:tree:Announce-scan-dynamic})
 for any operations that have been announced but not yet placed into the leaf.
-If a thread has announced both the data and its position inside the leaf,
-the thread performing the split rewrites the data into that position,
+If a thread has announced both the data and its position inside the leaf 
+(lines~\ref{alg:tree:announce-scan:D-data} and~\ref{alg:tree:announce-scan:D-position}),
+the thread performing the split rewrites the data into that position (line~\ref{alg:tree:announce-scan:store-in-D-dynamic}),
 as was done in FreSh. Additionally, if the sequence number is unassigned,
 the worker helps assign one. However, if the position has not yet been announced,
-the data is temporarily stored in a buffer called \textit{splitBuffer}.  
+the data is temporarily stored in a buffer called \textit{splitBuffer}
+(lines~\ref{alg:tree:add-splitbuffer-D}-\ref{alg:tree:announce-scan:data-copy-dynamic})
+as it did in FreSh.  
 
 Next, the index worker distributes the elements stored in \textit{splitBuffer},
 along with those already in the leaf, to the new left and right child nodes
 based on their iSAX summaries. During this process, for elements originally
 from the leaf, the worker checks their sequence numbers and assigns one
-if necessary. This step is crucial because the leaf remains connected to the
+if necessary (Algorithm ~\ref{alg:tree-split-dynamic} lines~\ref{alg:split-dynamic-belong-D-start}-\ref{alg:split-dynamic-belong-D-end}).
+This step is crucial because the leaf remains connected to the
 tree, making it visible to query workers, which may have included it in their
 query results.  
 
 Once all elements are distributed, the worker attempts to finalize the split
-using a \CAS operation, following the same approach as in FreSh. However,
+using a \CAS\ operation, following the same approach as in FreSh. However,
 to fully complete the split, a traversal of the newly created child nodes
 is required. This is because elements moved from the \textit{splitBuffer}
 may still have unassigned sequence numbers. Importantly, this traversal must
@@ -679,6 +695,7 @@ visible to query workers. If these elements receive a sequence number smaller
 than or equal to that of an ongoing query before the split is finalized,
 it could lead to correctness violations. 
 
+\noindent{\textbf{Marked Case.}}
 There is one final scenario that can occur during splitting, which we address
 using the keyword \textit{MARKED}. Consider the following case: an index worker
 announces its data and acquires a position in the leaf but becomes slow before
@@ -705,6 +722,10 @@ inserting the data. A query encountering a \textit{MARKED} position treats it as
 invalid. During the split operation, all marked positions are reset to \( \bot \), 
 ensuring that these elements receive a sequence number either from a query worker
 or when processing the new child nodes after the split.
+
+\clearpage
+
+\include{src/counterObject}
 
 \include{src/evaluation}
 
