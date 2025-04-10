@@ -12,11 +12,13 @@ Ubuntu Linux 16.04.7. LTS and has 256GB of RAM. Code is written in C and
 compiled using gcc v11.2.1 with O2 optimizations.
 
 \noindent{\bf Datasets.}
-We evaluated \Fresh\ and the competing algorithms (all algorithms are in-memory) using both real and synthetic datasets.
-The synthetic data series, \emph{Random}, are generated as random-walks (i.e., cumulative sums) of 
-steps that follow a Gaussian distribution (0,1).
-This type of data has been extensively used
-~\cite{conf/sigmod/Faloutsos1994,isax2plus,conf/kdd/Zoumpatianos2015,DBLP:journals/vldb/ZoumpatianosLIP18,DBLP:journals/pvldb/EchihabiZPB18,DBLP:journals/pvldb/EchihabiZPB19}, 
+We evaluated \Fresh\ and the competing algorithms (all algorithms are in-memory)
+using both real and synthetic datasets.
+The synthetic data series, \emph{Random}, are generated as random-walks
+(i.e., cumulative sums) of steps that follow a Gaussian distribution (0,1).
+This type of data has been extensively used in the experimental analysis of many 
+previous papers
+~\cite{conf/sigmod/Faloutsos1994,isax2plus,conf/kdd/Zoumpatianos2015,DBLP:journals/vldb/ZoumpatianosLIP18,DBLP:journals/pvldb/EchihabiZPB18,DBLP:journals/pvldb/EchihabiZPB19}
 and models the distribution of stock market prices~\cite{conf/sigmod/Faloutsos1994}.
 Our real datasets come from the domains of seismology and astronomy.
 The seismic dataset, \emph{Seismic}, was obtained from the IRIS Seismic Data Access
@@ -24,8 +26,8 @@ archive~\cite{url/data/seismic}. It contains seismic instrument recordings from
 thousands of stations worldwide and consists of 100 million data series of size 256,
 i.e. its size is 100GB. 
 The astronomy dataset, \emph{Astro}, represents celestial objects and was obtained 
-from~\cite{journal/aa/soldi2014}. The dataset consists of 270 million data series of
-size 256, i.e. its size is 265GB.
+from~\cite{journal/aa/soldi2014}. The dataset consists of 265 million data series of
+size 256, i.e. its size is 270GB.
 % 
 Since the main memory of our machine is limited to 256GB, we only use the first 200GB
 of the Astro dataset in our experiments.
@@ -53,7 +55,7 @@ of the Astro dataset in our experiments.
 % 
 We measure (i) the {\em summarization time} required to calculate
 the iSAX summaries and fill-in the summarization buffers, 
-(ii) the {\em tree time} required to insert the items of the receive buffers in the
+(ii) the {\em tree time} required to insert the items of the summarization buffers in the
 tree-index and (iii) the {\em query answering time} required to answer 100 queries
 that are not part of the dataset. 
 The  sum of the above times constitute the {\em total time}.
@@ -69,19 +71,20 @@ optimized version of the original \MESSI\ implementation,
 where we have applied all the code enhancements incorporated by \Fresh.
 % 
 We also compare \Fresh\ against an extended version of MESSI, called \MESSIenh
-, that allows several threads to concurrently populate the same sub-tree, during tree creation
-(instead of using a single thread for each subtree).
-This is implemented using fine-grained locks that are attached on each leaf node of a subtree.
-\MESSIenh\ allows to compare the lock-free index construction phase of \Fresh\ against a more
-efficient blocking one than that of original \MESSI.
+, that allows several threads to concurrently populate the same sub-tree, 
+during tree creation (instead of using a single thread for each subtree).
+This is implemented using fine-grained locks that are attached on each leaf
+node of a subtree.
+\MESSIenh\ allows to compare the lock-free index construction phase of \Fresh\ against
+a more efficient blocking one than that of original \MESSI.
 
 Figure~\ref{fig:eval:fresh-messi-threads:random} shows that all algorithms
-(\Fresh, \MESSI, and \MESSIenh) continue scaling as the number of threads is increasing,
-for Seismic 100GB. This is true for all three phases. 
+(\Fresh, \MESSI, and \MESSIenh) continue scaling as the number of threads is increasing.
+This is true for all three phases. 
 Moreover, the total execution time of \Fresh\ 
 (Figure~\ref{fig:eval:fresh-messi-threads:random:total-from-4})
-is almost the same as the total execution time of all its competitors, although it is the
-only lock-free approach. 
+is almost the same as the total execution time of its competitors, although it
+is the only lock-free approach. 
 As expected, the tree index construction time of \Fresh\ is smaller than \MESSI's 
 (Figure~\ref{fig:eval:fresh-messi-threads:random:tree-from-4}), since \Fresh\ allows
 subtrees to be populated concurrently by multiple threads, allowing parallelism during
@@ -89,13 +92,15 @@ this phase, in contrast to \MESSI.
 Interestingly, \Fresh\ achieves better performance than \MESSIenh, in most cases.
 The results for Seismic are similar and are omitted for brevity.
 Considering scalability as the size of the dataset increases, 
-Figure~\ref{fig:eval:scale-dataset:random} demonstrates that \Fresh\ scales well
-on all three datasets. In most cases, \Fresh\ is faster than \MESSI.
+Figure~\ref{fig:eval:scale-dataset:random} and Figure~\ref{fig:eval:scale-dataset:real} 
+demonstrates that \Fresh\ scales well on all three datasets. 
+In most cases, \Fresh\ is faster than \MESSI.
 Following previous works~\cite{DBLP:journals/vldb/ZoumpatianosLIP18,PFP21-I},
 we also conducted experiments with query workloads of increasing difficulty.
-For these workloads, we select series at random from the collection, add to each point
-Gaussian noise ($\mu = 0$, $sigma = 0.01-0.1$), and use these as our queries. 
-Figure~\ref{fig:eval:scale-query-difficulty:seismic:total} presents the results for
+For these workloads, we select series at random from the collection, add to
+each point Gaussian noise ($\mu = 0$, $sigma = 0.01-0.1$), and use these as 
+our queries. 
+Figure~\ref{fig:eval:scale-query-difficulty} presents the results for
 the Seismic dataset, where \Fresh\ performs better than \MESSI\ in most cases.
 
 
@@ -191,7 +196,7 @@ the Seismic dataset, where \Fresh\ performs better than \MESSI\ in most cases.
     \label{fig:eval:scale-dataset:real}
 \end{figure}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% QUERY ANSWERING: Query Difficulty %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{figure*}[htbp]
     \centering
@@ -200,37 +205,20 @@ the Seismic dataset, where \Fresh\ performs better than \MESSI\ in most cases.
         \caption{Seismic - Total (Query Difficulty)}
         \label{fig:eval:scale-query-difficulty:seismic:total}
     \end{subfigure}    
-    \begin{subfigure}{0.48\textwidth}
-        \includegraphics[width=\textwidth]{figures/Experiments/scale-dataset-tree-index-random.png}
-        \caption{Tree Index - Random}
-        \label{fig:eval:scale-dataset:tree-index:random}
-    \end{subfigure}    
-
-    \begin{subfigure}{0.48\textwidth}
-        \includegraphics[width=\textwidth]{figures/Experiments/scale-dataset-tree-index-seismic.png}
-        \caption{Tree Index - Seismic}
-        \label{fig:eval:scale-dataset:tree-index:seismic}
-    \end{subfigure}    
-    % \begin{subfigure}{0.48\textwidth}
-    %     \includegraphics[width=\textwidth]{figures/Experiments/baselines-random-total.png}
-    %     \caption{Baseline Comparison - Random}
-    %     \label{fig:eval:baselines:random:100GB:total}
-    % \end{subfigure}    
-
-    \caption{(a) Comparison of \Fresh\ against \MESSI\ on Seismic 100GB with variable query difficulty, where an increasing percentage of noise is added to the original queries.
-    (b)-(c) Comparison of \Fresh\ index construction to other tree implementations.}
-    \label{fig:eval:scale-dataset:tree-index}
+    \caption{Comparison of \Fresh\ against \MESSI\ on Seismic 100GB with variable query difficulty,
+	 where an increasing percentage of noise is added to the original queries.}
+    \label{fig:eval:scale-query-difficulty}
 \end{figure*}
 
-
-\subsection{ FreSh vs Baselines.}
-We compare \Fresh\ against several baseline {\em lock-free} implementations of the 
-different stages of an iSAX-based index. 
-Our results (Figure~\ref{fig:eval:baselines:random:100GB:total})
-shows that \Fresh\ performs better than all these implementations.
+\subsection{ FreSh vs Baselines}
+We compare \Fresh\ against several baseline {\em lock-free} implementations of
+the different stages of an iSAX-based index. 
+Our results (Figure~\ref{fig:eval:baselines:random:100GB})
+shows that \Fresh\ performs better than all these implementations
+which are briefly described below.
 
 \noindent
-{\emph{\underline{Summarization Baseline:}}}
+{\emph{\underline{Summarization Baselines:}}}
 For buffer creation, we have experimented with three implementations: \DoAllSplit,
 \FI, and \CASBased. All use a single summarization buffer with as many
 elements as \RawData.
@@ -238,8 +226,8 @@ elements as \RawData.
 \DoAllSplit\ splits \RawData\ into as many equaly-sized chunks as the number of threads.  
 It stores a {\em done} flag with each data series, which is set after the data series is processed.
 Each thread traverses \RawData\ (circularly), starting from the first element of its assigned chunk.
-The thread first checks whether the done flag of a data series is set, and processes it only if not. 
-%
+It checks whether the done flag of a data series is set, and processes it only if not. 
+
 In \FI, threads use \FAI\ to get assigned data series from \RawData\ to process.  
 Each thread $t$ repeatedly performs the following:
 It executes a \FAI\ on $O$ to get a position $v$ of RawData,
@@ -249,21 +237,22 @@ This flag, which we call {\em done}, is set to true after the data series has be
 has been stored in the summarization buffer. 
 When a thread figures out that all \RawData\ elements have been assigned,
 (i.e., \FAI\ returns a value higher than the number of elements of RawData), 
-it re-traverses \RawData\ to identify data series whose done flag is still \False,
+it re-traverses \RawData\ to identify data series whose done flag is still \False\
 and processes them. 
-%
-\CASBased\ works similarly to \FI, while it uses \CAS\ instructions, instead of \FAI.
+
+\CASBased\ works similarly to \FI, while it uses \CAS\ instructions, instead
+of \FAI.
 %
 \Fresh\ performs significantly better than all these implementations
-(Fig.~\ref{fig:eval:baselines:random:100GB:total}).
+(Fig.~\ref{fig:eval:baselines:random:100GB:summarization}).
 
 
 \noindent
-{\emph{\underline{Tree Population Baseline:}}}
+{\emph{\underline{Tree Population Baselines:}}}
 Each thread is assigned elements of the summarization buffer using \FAI\
 and inserts them in the index tree. 
 To achieve lock-freedom in traversing the summarization buffer, 
-we apply the \DoAllSplit, \FI, and \CASBased\ techniques we describe above.
+we apply the \DoAllSplit, \FI, and \CASBased\ techniques we described above.
 %
 To achieve lock-freedom in accessing the tree, we utilize a flagging technique~\cite{EFR+10},
 in addition to our new tree implementation. 
@@ -282,23 +271,21 @@ by applying the \FI\ technique on \RawData.
 
 
 \noindent
-{\emph{\underline{Pruning Baseline:}}}
-All baselines use a single instance of an existing skip-based lock-free priority queue~\cite{LJ13}
-to store the candidate data series for refinement.
+{\emph{\underline{Query Answering Baseline:}}}
+For the Prunning stage all baselines we consider use a single instance of an 
+existing skip-based lock-free priority queue~\cite{LJ13} to store the candidate
+data series for refinement.
 Threads uses \FAI\ to find the next node to examine in the index tree.
-When a thread $t$ discovers that all nodes 
-of the tree have been assigned for processing, it re-traverses 
-the tree to find nodes that may still  be
+When a thread $t$ discovers that all nodes of the tree have been assigned for
+processing, it re-traverses the tree to find nodes that may still  be
 unprocessed, and processes them. 
 A flag is maintained for each tree node to indicate whether its
-processing has been completed. This flag is set when the node is marked as processed. 
-During re-traversal, $t$ examines
+processing has been completed. This flag is set when the node is marked as
+processed. During re-traversal, $t$ examines
 the flag of each element it visits, and does not process it if 
 its flag is set (i.e., if the node is marked as processed).
 
-\noindent
-{\emph{\underline{Refinement Baseline:}}}
-All threads, repeatedly call DeleteMin
+For the Refinement stage all threads, repeatedly call DeleteMin
 to remove elements from the priority queue, and calculate their real distance computation. 
 This simple algorithm is not lock-free as a thread may crash after it has
 deleted an element from the queue. In this case, the deleted leaf will not be 
@@ -306,24 +293,21 @@ processed. This problem can be easily fixed but that would increase the cost
 of DeleteMin. Experiments show that even the non lock-free simple technique
 above is quite costly in comparison to our approach.
 
-Our results show that \Fresh\
-performs significantly better than all these implementations,
-for query answering time (that includes pruning and refinement, 
-Figure~\ref{fig:eval:baselines:random:100GB:query-answering}),.
+The performance comparison between \Fresh\ agaisnt the baselines for query 
+answering, which includes both the pruning and refinement stages, is presented
+in Figure~\ref{fig:eval:baselines:random:100GB:query-answering}.
+As shown, \Fresh\ consistently outperforms the other algorithms in terms of
+efficiency. Additionally, Figure~\ref{fig:eval:baselines:random:100GB:total}
+reports the total time required for index construction and query answering
+combined, where once again, \Fresh\ demonstrates significantly better
+performance than all competing approaches.
 
 \begin{figure*}[htbp]
-    \centering
-    \begin{subfigure}{0.48\textwidth}  
-        \includegraphics[width=\textwidth]{figures/Experiments/baselines-random-total.png}
-        \caption{Total}
-        \label{fig:eval:baselines:random:100GB:total}
-    \end{subfigure}    
     \begin{subfigure}{0.48\textwidth}  
         \includegraphics[width=\textwidth]{figures/Experiments/baselines-random-summarization.png}
         \caption{Summarization}
         \label{fig:eval:baselines:random:100GB:summarization}
     \end{subfigure}    
-
     \begin{subfigure}{0.48\textwidth}  
         \includegraphics[width=\textwidth]{figures/Experiments/baselines-random-tree.png}
         \caption{Tree index}
@@ -333,7 +317,12 @@ Figure~\ref{fig:eval:baselines:random:100GB:query-answering}),.
         \includegraphics[width=\textwidth]{figures/Experiments/baselines-random-query.png}
         \caption{Query answering}
         \label{fig:eval:baselines:random:100GB:query-answering}
-    \end{subfigure}    
+    \end{subfigure}  
+    \begin{subfigure}{0.48\textwidth}  
+        \includegraphics[width=\textwidth]{figures/Experiments/baselines-random-total.png}
+        \caption{Total}
+        \label{fig:eval:baselines:random:100GB:total}
+    \end{subfigure}   
 
     \caption{Comparison of \Fresh\ against baseline implementations on 100GB Random.}
     \label{fig:eval:baselines:random:100GB}
@@ -362,13 +351,36 @@ copy of the subtree (i.e. one that is accessible only to $t$) and only after its
 $t$ tries to make it the (single) shared version of this subtree (by atomically changing a pointer 
 using a \CAS\ instruction); threads help each other by following the same procedure.
 
-Figures~\ref{fig:eval:scale-dataset:tree-index:random}-\ref{fig:eval:scale-dataset:tree-index:seismic}
+Figures~\ref{fig:eval:scale-dataset:tree-index}-\ref{fig:eval:scale-dataset:tree-index:seismic}
 compare \Fresh\ against the modified versions 
-on Random and Seismic with variable dataset sizes and shows that it performs better than them,
-in all cases. Interestingly, for Seismic 50GB \Fresh\ performs similarly to \FreshTreeCopy.
+on Random and Seismic with variable dataset sizes and shows that it performs better than them
+in all cases. Interestingly, for Seismic 50GB, \Fresh\ performs similarly to \FreshTreeCopy.
 Recall that each thread works on its own private copy and, on each subtree, they contend at most once 
 on the corresponding \CAS\ object. So, \FreshTreeCopy\ both restricts parallelism and minimizes the 
 synchronization cost, which are properties that provide an advantage on Seismic. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{figure*}[htbp]
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\textwidth]{figures/Experiments/scale-dataset-tree-index-random.png}
+        \caption{Tree Index - Random}
+        \label{fig:eval:scale-dataset:tree-index:random}
+    \end{subfigure}    
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=\textwidth]{figures/Experiments/scale-dataset-tree-index-seismic.png}
+        \caption{Tree Index - Seismic}
+        \label{fig:eval:scale-dataset:tree-index:seismic}
+    \end{subfigure}    
+    % \begin{subfigure}{0.48\textwidth}
+    %     \includegraphics[width=\textwidth]{figures/Experiments/baselines-random-total.png}
+    %     \caption{Baseline Comparison - Random}
+    %     \label{fig:eval:baselines:random:100GB:total}
+    % \end{subfigure}    
+
+    \caption{(a)-(b) Comparison of \Fresh\ index construction to other tree implementations.}
+    \label{fig:eval:scale-dataset:tree-index}
+\end{figure*}
 
 
 \noindent {\bf Thread Delays.} 
@@ -381,7 +393,7 @@ the algorithm will never terminate. Thus, we do not perform experiments for this
 This is due to the barriers that are utilized in their implementation.
 These barriers are necessary for producing correct outcomes and their ignorance even by one thread
 could compromise correctness. 
-%
+
 Figure~\ref{fig:eval:failure-query:random:failure1} illustrates 
 that the delay even of a single thread causes a linear overhead on the performance of \MESSI, 
 whereas it hardly has any impact in the performance of \Fresh.
@@ -389,21 +401,21 @@ This is so because in \Fresh, helper threads undertake the work to be done by th
 efficiently compensating the overhead from the failed thread delay.  
 %S
 Moreover, Figure~\ref{fig:eval:failure-query:random:failure2}
-shows that \MESSI\ takes (almost) the full performance hit of delayed threads right from the beginning:
-even a single delayed thread blocks 
+shows that \MESSI\ takes (almost) the full performance hit of delayed threads right
+from the beginning: even a single delayed thread blocks 
 the execution of all other threads, and hence of the entire algorithm.
 \Fresh\ gracefully adapts to the situation of increasing number of delayed threads, 
 achieving a speedup. % for Random and Seismic. 
 When all-but-one threads fail, \Fresh\ is still faster than \MESSI\ because 
 the single non-failing thread helps the others.
-%
+
 Note that these synthetic benchmarks are designed to simply illustrate the impact of lock-freedom 
 on performance when threads may experience delays (or crash),
-and not to capture some realistic setting. % for our studied problem.
+and not to capture some realistic setting. 
 Note that \MESSI\ will not terminate execution even if a single thread fails. 
 In the case of failures (see Figure~\ref{fig:eval:variable-num-failures}),
 \Fresh\ always terminates execution, performing almost identical to \MESSI\ 
-with the same number of non-failing threads. This demonstrates that \Fresh adapts
+with the same number of non-failing threads. This demonstrates that \Fresh\ adapts
 to dynamic thread environments, maintaining high performance levels.
 
 
